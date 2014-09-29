@@ -5,7 +5,7 @@ inherit populate_sdk populate_sdk_qt5
 SDK_PACKAGING_FUNC = "generate_installer_package"
 
 SDK_TARGET = "${REAL_MULTIMACH_TARGET_SYS}"
-SDK_TARGET_DEFAULT_DIRECTORY = "${SDKPATH}"
+# SDK_TARGET_DEFAULT_DIRECTORY = "${SDKPATH}"
 
 # Create an installer-package for Qt installer-framework.
 # Note: the space before the '}' in the heredoc are here to avoid error with
@@ -18,7 +18,7 @@ fakeroot generate_installer_package () {
     INSTALLER_PACKAGE_DATE="$(date +%F)"
 
     # do_populate_sdk done previously a useless tarball.
-    rm -f ${SDK_DEPLOY}/${TOOLCHAIN_OUTPUTNAME}.tar.bz2
+    rm -f ${SDK_DEqPLOY}/${TOOLCHAIN_OUTPUTNAME}.tar.bz2
 
     # create node package ${INSTALLER_PACKAGE_NAME}
     mkdir -p ${INSTALLER_PACKAGE_DEPLOY_DIRECTORY}/${INSTALLER_PACKAGE_NAME}/meta/
@@ -61,7 +61,7 @@ Component.prototype.createOperations = function()
 {
     component.createOperations();
 
-    component.addOperation("Execute", "@TargetDir@/SDK/${SDK_TARGET}/setup-sdk.sh", "@TargetDir@");
+    component.addOperation("Execute", "@TargetDir@/SDK/${SDK_TARGET}/setup-sdk.sh");
 
     if (installer.componentByName("qt_creator").installationRequested() ||
         installer.componentByName("qt_creator").isInstalled())
@@ -84,19 +84,15 @@ EOF
 </Package>
 EOF
 
+    # create the file that store the default install direcotory
+    echo "${SDKPATH}" > ${INSTALLER_PACKAGE_DEPLOY_DIRECTORY}/${INSTALLER_PACKAGE_NAME}.sdk/data/SDK/${SDK_TARGET}/last-install-directory
+
     # create setup script for sdk (normally done by the auto-extractible archive)
     cat << "EOF" > ${INSTALLER_PACKAGE_DEPLOY_DIRECTORY}/${INSTALLER_PACKAGE_NAME}.sdk/data/SDK/${SDK_TARGET}/setup-sdk.sh
 #! /bin/bash
 
-# This script must be called with the installation path of the SDK
-if [ $# -lt 1 ]; then
-    echo "Usage: $0 <installation path>"
-    exit 1
-fi
-
-SDK_DIRECTORY="$1"
-
-SDK_TARGET_DIRECTORY="${SDK_DIRECTORY}/SDK/${SDK_TARGET}"
+SDK_TARGET_DIRECTORY="$(cd $(dirname $(readlink -f $0)) && pwd)"
+SDK_DEFAULT_TARGET_DIRECTORY="$(cat ${SDK_TARGET_DIRECTORY}/last-install-directory)"
 SDK_ENV_SETUP_SCRIPT="${SDK_TARGET_DIRECTORY}/environment-setup-${SDK_TARGET}"
 REPLACES="s:${SDK_TARGET_DEFAULT_DIRECTORY}:${SDK_TARGET_DIRECTORY}:g"
 
@@ -141,8 +137,7 @@ for perl_script in $(grep "^#!.*perl" -rl ${NATIVE_SYSROOT}); do
            -e "s: /usr/bin/perl: /usr/bin/env perl:g" $perl_script
 done
 
-rm ${SDK_TARGET_DIRECTORY}/relocate_sdk.py
-rm ${SDK_TARGET_DIRECTORY}/setup-sdk.sh
+echo "${SDK_DEFAULT_TARGET_DIRECTORY}" > ${SDK_TARGET_DIRECTORY}/last-install-directory
 
 exit 0
 EOF
@@ -152,13 +147,12 @@ EOF
     cat << "EOF" > ${INSTALLER_PACKAGE_DEPLOY_DIRECTORY}/${INSTALLER_PACKAGE_NAME}.sdk/data/SDK/${SDK_TARGET}/add-kit.sh
 #! /bin/bash
 
-if [ $# -lt 1 -or "$1" == "-h" -or "$1" == "--help" ]; then
-    echo "Usage: $0 <installation path> [ <sdktool path> ]"
+if [ "$1" == "-h" -or "$1" == "--help" ]; then
+    echo "Usage: $0 [ <sdktool path> ]"
     exit 1
 fi
 
-SDK_DIRECTORY="$1"
-SDK_TARGET_DIRECTORY="${SDK_DIRECTORY}/SDK/${SDK_TARGET}"
+SDK_TARGET_DIRECTORY="$(cd $(dirname $(readlink -f $0)) && pwd)"
 
 if [ $# -gt 1 ]; then
     SDKTOOL=$(which "$2")
