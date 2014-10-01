@@ -5,7 +5,7 @@ IMAGE_FEATURES += "splash package-management ssh-server-dropbear"
 LICENSE = "MIT"
 
 # inherit from freenivi-emualtor instead of core-image.
-inherit freenivi-emulator
+inherit freenivi_emulator
 
 IMAGE_INSTALL += "tzdata tzdata-europe"
 IMAGE_INSTALL += "avahi-utils"
