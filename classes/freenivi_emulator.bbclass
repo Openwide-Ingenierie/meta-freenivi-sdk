@@ -1,9 +1,9 @@
 inherit core-image
 
 # tools needed for deploy
-IMAGE_FEATURES_remove = "ssh-server-dropbear"
-IMAGE_FEATURES += "ssh-server-openssh"
-IMAGE_INSTALL += "openssh-sftp-server qtbase qtbase-fonts qtbase-plugins qtbase-tools"
+# IMAGE_FEATURES_remove = "ssh-server-dropbear"
+# IMAGE_FEATURES += "ssh-server-openssh"
+IMAGE_INSTALL += "dhcp-client openssh-sftp-server qtbase qtbase-fonts qtbase-plugins qtbase-tools"
 
 # problably only right for qemux86
 EMULATOR_ROOTFS = "${IMAGE_LINK_NAME}.ext3"
@@ -11,13 +11,14 @@ EMULATOR_KERNEL = "bzImage"
 
 SDK_TARGET = "${REAL_MULTIMACH_TARGET_SYS}"
 
-INHERIT += "extrausers"
+inherit extrausers
 EXTRA_USERS_PARAMS = " \
     usermod -p '\$1\$s2pp8yHi\$3N6qudJI2p2.qFqQ81qvK0' root; \
     "
 
+
+
 do_rootfs_append () {
-    bb.buidl.exec_func("configure_sshd", d)
     bb.build.exec_func("generate_installer_package", d)
 }
 

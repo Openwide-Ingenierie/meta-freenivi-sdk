@@ -7,6 +7,8 @@ LICENSE = "MIT"
 # inherit from freenivi-emualtor instead of core-image.
 inherit freenivi_emulator
 
+IMAGE_INSTALL += "autologin config"
+
 IMAGE_INSTALL += "tzdata tzdata-europe"
 IMAGE_INSTALL += "avahi-utils"
 IMAGE_INSTALL += "procps"
