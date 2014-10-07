@@ -1,7 +1,7 @@
 SUMMARY = "SDK Configuration files"
 DESCRIPTION = "All configuration files that needed to be in the rootfs for the SDK"
 LICENSE = "MIT" 
-LIC_FILES_CHKSUM = "file://.profile;md5=001c16a81b674877f74bf8783ef7dfca"
+LIC_FILES_CHKSUM = "file://.profile;md5=6d6af62eac57c4e3faeda538d16db44e"
 
 SRC_URI = "file://.profile"
 
