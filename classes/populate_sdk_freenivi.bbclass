@@ -18,7 +18,7 @@ fakeroot generate_installer_package () {
     INSTALLER_PACKAGE_DATE="$(date +%F)"
 
     # do_populate_sdk done previously a useless tarball.
-    rm -f ${SDK_DEqPLOY}/${TOOLCHAIN_OUTPUTNAME}.tar.bz2
+    rm -f ${SDK_DEPLOY}/${TOOLCHAIN_OUTPUTNAME}.tar.bz2
 
     # create node package ${INSTALLER_PACKAGE_NAME}
     mkdir -p ${INSTALLER_PACKAGE_DEPLOY_DIRECTORY}/${INSTALLER_PACKAGE_NAME}/meta/
