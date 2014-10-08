@@ -7,7 +7,7 @@ IMAGE_INSTALL += "dhcp-client openssh-sftp-server qtbase qtbase-fonts qtbase-plu
 
 # problably only right for qemux86
 EMULATOR_ROOTFS = "${IMAGE_LINK_NAME}.ext3"
-EMULATOR_KERNEL = "bzImage"
+EMULATOR_KERNEL = "${KERNEL_IMAGETYPE}"
 
 SDK_TARGET = "${REAL_MULTIMACH_TARGET_SYS}"
 
