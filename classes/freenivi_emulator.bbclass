@@ -17,6 +17,7 @@ EXTRA_USERS_PARAMS = " \
     "
 EMULATOR_QEMU_ARCH_qemuarm = "arm"
 EMULATOR_QEMU_qemuarm = "qemu-system-arm \ 
+    -kernel ${KERNEL} \
     -hda ${ROOTFS} \
     -no-reboot \
     -serial stdio \
@@ -132,7 +133,7 @@ wait ${QEMU_PID}
 EOF
     chmod +x ${INSTALLER_PACKAGE_DEPLOY_DIRECTORY}/${INSTALLER_PACKAGE_NAME}.emulator/data/SDK/${SDK_TARGET}/emulator/emulator
     if [ ${EMULATOR_QEMU_ARCH} != "x86_64" ]; then
-        sed -i 's/@@KVM@@/[ "$kvm_acceleration" -eq 1 ] && >&2 echo "$program: cannot use kvm acceleration" && kvm_acceleration=0/' ${INSTALLER_PACKAGE_DEPLOY_DIRECTORY}/${INSTALLER_PACKAGE_NAME}.emulator/data/SDK/${SDK_TARGET}/emulator/emulator
+        sed -i 's/@@KVM@@/[ "$kvm_acceleration" -eq 1 ] \&\& >\&2 echo "$program: cannot use kvm acceleration" \&\& kvm_acceleration=0/' ${INSTALLER_PACKAGE_DEPLOY_DIRECTORY}/${INSTALLER_PACKAGE_NAME}.emulator/data/SDK/${SDK_TARGET}/emulator/emulator
     else
         sed -i 's/@@KVM@@//' ${INSTALLER_PACKAGE_DEPLOY_DIRECTORY}/${INSTALLER_PACKAGE_NAME}.emulator/data/SDK/${SDK_TARGET}/emulator/emulator
     fi
