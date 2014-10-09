@@ -21,7 +21,7 @@ EMULATOR_QEMU_qemuarm = "qemu-system-arm \
     -hda ${ROOTFS} \
     -no-reboot \
     -serial stdio \
-    -append 'vga=0 console=ttyS0 console=tty1 root=/dev/sda rw' \
+    -append 'vga=0 ip=dhcp console=ttyS0 console=tty1 root=/dev/sda rw' \
     -machine versatilepb \
     -m ${MEMORY} \
     -net nic,model=smc91c111 \
@@ -38,7 +38,7 @@ EMULATOR_QEMU_qemux86 = "qemu-system-x86_64 \
     -m ${MEMORY} \
     -vga vmware \
     -serial stdio \
-    -append 'vga=0 console=ttyS0 console=tty1 uvesafb.mode_option=640x480-32 root=/dev/hda rw' \
+    -append 'vga=0 ip=dhcp console=ttyS0 console=tty1 uvesafb.mode_option=640x480-32 root=/dev/hda rw' \
     ${OPTIONS} \
     $@"
 
