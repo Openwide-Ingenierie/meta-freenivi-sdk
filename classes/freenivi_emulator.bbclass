@@ -15,8 +15,31 @@ inherit extrausers
 EXTRA_USERS_PARAMS = " \
     usermod -p '\$1\$s2pp8yHi\$3N6qudJI2p2.qFqQ81qvK0' root; \
     "
-
-
+EMULATOR_QEMU_ARCH_qemuarm = "arm"
+EMULATOR_QEMU_qemuarm = "qemu-system-arm \ 
+    -hda ${ROOTFS} \
+    -no-reboot \
+    -serial stdio \
+    -append 'vga=0 console=ttyS0 console=tty1 root=/dev/sda rw' \
+    -machine versatilepb \
+    -m ${MEMORY} \
+    -net nic,model=smc91c111 \
+    -net user,hostfwd=tcp::${SSHPORT}-:22 \
+    ${OPTIONS} \
+    $@"
+EMULATOR_QEMU_qemux86 = "x86_64"
+EMULATOR_QEMU_qemux86 = "qemu-system-x86_64 \
+    -kernel ${KERNEL} \
+    -hda ${ROOTFS} \
+    -netdev user,id=freenivi,hostfwd=tcp::${SSHPORT}-:22 \
+    -device e1000,netdev=freenivi \
+    -no-reboot \
+    -m ${MEMORY} \
+    -vga vmware \
+    -serial stdio \
+    -append 'vga=0 console=ttyS0 console=tty1 uvesafb.mode_option=640x480-32 root=/dev/hda rw' \
+    ${OPTIONS} \
+    $@"
 
 do_rootfs_append () {
     bb.build.exec_func("generate_installer_package", d)
@@ -50,14 +73,6 @@ EOF
     cat << "EOF" > ${INSTALLER_PACKAGE_DEPLOY_DIRECTORY}/${INSTALLER_PACKAGE_NAME}.emulator/data/SDK/${SDK_TARGET}/emulator/emulator
 #! /bin/bash
 
-# set qemu architecture
-case ${MACHINE} in
-    qemuarm-freenivi | qemuarm )
-        QEMU_ARCH="arm";;
-    qemux86-freenivi | qemux86 | qemux86-64-freenivi | qemux86-64 )
-        QEMU_ARCH="x86_64";;
-esac
-
 # get qemu path
 EMULATOR_TARGET_DIRECTORY="$(cd `dirname "${BASH_SOURCE[0]}"` && pwd)"
 SDK_SYSROOT_DIRECTORY="${EMULATOR_TARGET_DIRECTORY%/*}/sysroots/${SDK_ARCH}${SDK_VENDOR}-${SDK_OS}"
@@ -86,13 +101,7 @@ while true ; do
     esac
 done
 
-# check architecture for kvm
-if [ "${QEMU_ARCH}" != "x86_64" ]; then
-    if [ "$kvm_acceleration" -eq 1 ]; then
-        >&2 echo "$program: cannot use kvm acceleration"
-        kvm_acceleration=0
-    fi
-fi
+@@KVM@@
 
 # check ssh port
 if [ $SSHPORT -lt 1024 -o $SSHPORT -gt 66535 ]; then
@@ -112,23 +121,19 @@ fi
 KERNEL=${EMULATOR_TARGET_DIRECTORY}/${EMULATOR_KERNEL}
 ROOTFS=${EMULATOR_TARGET_DIRECTORY}/${EMULATOR_ROOTFS}
 
-cmd="${QEMU} \
-    -kernel ${KERNEL} \
-    -hda ${ROOTFS} \
-    -netdev user,id=freenivi,hostfwd=tcp::${SSHPORT}-:22 \
-    -device e1000,netdev=freenivi \
-    -no-reboot \
-    -m ${MEMORY} \
-    -vga vmware \
-    -serial stdio \
-    -append 'vga=0 console=ttyS0 console=tty1 uvesafb.mode_option=640x480-32 root=/dev/hda rw' \
-    ${OPTIONS} \
-    $@ \
-"
+cmd="${EMULATOR_QEMU}"
 
 echo $cmd
+eval "$cmd &"
+QEMU_PID=$!
+trap ">&2 echo 'Emulator stopped'; kill -9 ${QEMU_PID}" SIGTERM
+wait ${QEMU_PID}	
 
-eval $cmd
 EOF
     chmod +x ${INSTALLER_PACKAGE_DEPLOY_DIRECTORY}/${INSTALLER_PACKAGE_NAME}.emulator/data/SDK/${SDK_TARGET}/emulator/emulator
+    if [ ${EMULATOR_QEMU_ARCH} != "x86_64" ]; then
+        sed -i 's/@@KVM@@/[ "$kvm_acceleration" -eq 1 ] && >&2 echo "$program: cannot use kvm acceleration" && kvm_acceleration=0/' ${INSTALLER_PACKAGE_DEPLOY_DIRECTORY}/${INSTALLER_PACKAGE_NAME}.emulator/data/SDK/${SDK_TARGET}/emulator/emulator
+    else
+        sed -i 's/@@KVM@@//' ${INSTALLER_PACKAGE_DEPLOY_DIRECTORY}/${INSTALLER_PACKAGE_NAME}.emulator/data/SDK/${SDK_TARGET}/emulator/emulator
+    fi
 }
