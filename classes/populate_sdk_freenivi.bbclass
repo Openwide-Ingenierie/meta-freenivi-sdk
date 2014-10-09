@@ -66,8 +66,8 @@ Component.prototype.createOperations = function()
     if (installer.componentByName("qt_creator").installationRequested() ||
         installer.componentByName("qt_creator").isInstalled())
         component.addOperation(
-            "Execute", "@TargetDir@/SDK/${SDK_TARGET}/add-kit.sh", "@TargetDir@", "@TargetDir@/QtCreator/bin/sdktool",
-            "UNDOEXECUTE", "@TargetDir@/SDK/${SDK_TARGET}/del-kit.sh", "@TargetDir@", "@TargetDir@/QtCreator/bin/sdktool"
+            "Execute", "@TargetDir@/SDK/${SDK_TARGET}/add-kit.sh", "@TargetDir@/QtCreator/bin/sdktool",
+            "UNDOEXECUTE", "@TargetDir@/SDK/${SDK_TARGET}/del-kit.sh", "@TargetDir@/QtCreator/bin/sdktool"
         );
  }
 EOF
@@ -147,15 +147,15 @@ EOF
     cat << "EOF" > ${INSTALLER_PACKAGE_DEPLOY_DIRECTORY}/${INSTALLER_PACKAGE_NAME}.sdk/data/SDK/${SDK_TARGET}/add-kit.sh
 #! /bin/bash
 
-if [ "$1" == "-h" -or "$1" == "--help" ]; then
+if [ "$1" == "-h" -o "$1" == "--help" ]; then
     echo "Usage: $0 [ <sdktool path> ]"
     exit 1
 fi
 
 SDK_TARGET_DIRECTORY="$(cd $(dirname $(readlink -f $0)) && pwd)"
 
-if [ $# -gt 1 ]; then
-    SDKTOOL=$(which "$2")
+if [ $# -gt 0 ]; then
+    SDKTOOL=$(which "$1")
 else
     SDKTOOL=$(which sdktool)
 fi
