@@ -137,6 +137,53 @@ for perl_script in $(grep "^#!.*perl" -rl ${NATIVE_SYSROOT}); do
            -e "s: /usr/bin/perl: /usr/bin/env perl:g" $perl_script
 done
 
+source ${SDK_ENV_SETUP_SCRIPT}
+
+# We need to create a new MKSPEC for the installed SDK without environment
+# variables
+
+# Set OE_QMAKE_COMPILER as environment-setup-${SDK_TARGET} does
+# not set it
+OE_QMAKE_COMPILER=gcc
+
+MKSPEC="linux-${DISTRO}-g++"
+MKSPEC_PATH="$QMAKESPEC/../$MKSPEC"
+cp -r "$QMAKESPEC" "$MKSPEC_PATH"
+error_code=$?
+if [ $error_code -ne 0 ]; then
+    echo "error: copy of OE MKSPEC failed"
+    exit $error_code
+fi
+
+VARLIST=$(sed -n 's/.*$(\(.*\)).*/\1/p' "$MKSPEC_PATH/qmake.conf" | sort -u)
+REPLACES=
+
+for VAR in $VARLIST; do
+    EVAL=${!VAR}
+    REPLACES+="s@\$($VAR)@$EVAL@g; "
+done
+
+sed -i "$REPLACES" "$MKSPEC_PATH/qmake.conf"
+
+# set absolute paths
+VARLIST=" \
+QMAKE_AR \
+QMAKE_STRIP \
+QMAKE_WAYLAND_SCANNER \
+QMAKE_CC \
+QMAKE_CXX \
+QMAKE_LINK \
+QMAKE_LINK_SHLIB \
+QMAKE_LINK_C \
+QMAKE_LINK_C_SHLIB \
+"
+
+for VAR in $VARLIST; do
+    VALUE=$(sed -n "s/$VAR *= *\([^ ]*\).*/\1/p" "$MKSPEC_PATH/qmake.conf")
+    ABSOLUTE_VALUE=$(command -v $VALUE)
+    sed -i "s%\($VAR *= *\)$VALUE%\1$ABSOLUTE_VALUE%" "$MKSPEC_PATH/qmake.conf"
+done
+
 echo "${SDK_DEFAULT_TARGET_DIRECTORY}" > ${SDK_TARGET_DIRECTORY}/last-install-directory
 
 exit 0
@@ -191,46 +238,9 @@ TOOLCHAIN_PATH=$(command -v $TOOLCHAIN)
 KIT_ID=${BASE_ID}KIT-${SDK_TARGET}
 KIT_NAME="${BASE_NAME} (${SDK_TARGET})"
 
-echo "Adding ${DISTRO_NAME} kit for ${SDK_TARGET}..."
-
-###################################[ PATH ]#####################################
-
-# It seems that the value of PATH differ between system
-# To be sure that the path is correct, we force it
-# The output script will be read by the "shortcut" of FreeNivi QtCreator
-
-grep "export PATH=" ${SDK_TARGET_DIRECTORY}/environment-setup-${SDK_TARGET} \
-    > ${SDK_TARGET_DIRECTORY}/path-setup.sh
-
-chmod +x  ${SDK_TARGET_DIRECTORY}/path-setup.sh
-
-##################################[ MKSPEC ]####################################
-
-# We need to create a new MKSPEC for the installed SDK without environment
-# variables
-
-# Set OE_QMAKE_COMPILER as environment-setup-${SDK_TARGET} does
-# not set it
-OE_QMAKE_COMPILER=gcc
-
 MKSPEC="linux-${DISTRO}-g++"
-MKSPEC_PATH="$QMAKESPEC/../$MKSPEC"
-cp -r "$QMAKESPEC" "$MKSPEC_PATH"
-error_code=$?
-if [ $error_code -ne 0 ]; then
-    echo "error: copy of OE MKSPEC failed"
-    exit $error_code
-fi
 
-VARLIST=$(sed -n 's/.*$(\(.*\)).*/\1/p' "$MKSPEC_PATH/qmake.conf" | sort -u)
-REPLACES=
-
-for VAR in $VARLIST; do
-    EVAL=${!VAR}
-    REPLACES+="s@\$($VAR)@$EVAL@g; "
-done
-
-sed -i "$REPLACES" "$MKSPEC_PATH/qmake.conf"
+echo "Adding ${DISTRO_NAME} kit for ${SDK_TARGET}..."
 
 ####################################[ ABI ]#####################################
 
