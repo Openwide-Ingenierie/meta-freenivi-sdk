@@ -82,6 +82,21 @@ QEMU="${SDK_SYSROOT_DIRECTORY}/usr/bin/qemu-system-${QEMU_ARCH}"
 program=`basename "${BASH_SOURCE[0]}"`
 cmdline=`getopt -o G:K:M:S:h --long 3d:,kvm:,mem:,ssh:,help -- "$@"`
 
+usage ()
+{
+    cat << EOF
+Usage: $program [OPTIONS]
+OPTIONS:
+ -G|--3d              enable 3D graphics acceleration
+ -K|--kvm             enable KVM (only available when host and ghest share the
+                      same architecture)
+ -M|--mem <value>     set the VM memory capacity to <value>
+ -S|--sshport <value> set the port to use for the ssh connection (must be a
+                      free port of the host)
+ -h|--help            display this help
+EOF
+}
+
 graphics_acceleration=0
 kvm_acceleration=0
 
@@ -125,6 +140,7 @@ ROOTFS=${EMULATOR_TARGET_DIRECTORY}/${EMULATOR_ROOTFS}
 cmd="${EMULATOR_QEMU}"
 
 echo $cmd
+
 eval "$cmd &"
 QEMU_PID=$!
 trap ">&2 echo 'Emulator stopped'; kill -9 ${QEMU_PID}" SIGTERM
