@@ -84,7 +84,7 @@ cmdline=`getopt -o G:K:M:S:h --long 3d:,kvm:,mem:,ssh:,help -- "$@"`
 
 usage ()
 {
-    cat << EOF
+    cat << EOT
 Usage: $program [OPTIONS]
 OPTIONS:
  -G|--3d              enable 3D graphics acceleration
@@ -94,7 +94,7 @@ OPTIONS:
  -S|--sshport <value> set the port to use for the ssh connection (must be a
                       free port of the host)
  -h|--help            display this help
-EOF
+EOT
 }
 
 graphics_acceleration=0
