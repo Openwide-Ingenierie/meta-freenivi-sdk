@@ -95,7 +95,7 @@ OPTIONS:
                       free port of the host)
  -h|--help            display this help
 EOT
-}
+ }
 
 graphics_acceleration=0
 kvm_acceleration=0
