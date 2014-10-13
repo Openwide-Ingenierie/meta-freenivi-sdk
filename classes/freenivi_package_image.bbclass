@@ -3,7 +3,7 @@ IMAGE_PACKAGE_NAME = "${IMAGE_LINK_NAME}"
 
 # problably only right for qemux86
 IMAGE_PACKAGE_ROOTFS = "${IMAGE_LINK_NAME}.ext3"
-IMAGE_PACKAGE_KERNEL = "bzImage"
+IMAGE_PACKAGE_KERNEL = "${KERNEL_IMAGETYPE}"
 
 do_rootfs_append () {
     bb.build.exec_func("generate_installer_package", d)
