@@ -82,6 +82,7 @@ EOF
     <ReleaseDate>${INSTALLER_PACKAGE_DATE}</ReleaseDate>
     <Name>${INSTALLER_PACKAGE_NAME}.sdk</Name>
     <Script>installscript.js</Script>
+    <SortingPriority>70</SortingPriority>
 </Package>
 EOF
 

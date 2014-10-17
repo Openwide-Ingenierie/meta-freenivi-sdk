@@ -42,6 +42,7 @@ EOF
     <Version>${INSTALLER_PACKAGE_VERSION}</Version>
     <ReleaseDate>${INSTALLER_PACKAGE_DATE}</ReleaseDate>
     <Name>${INSTALLER_PACKAGE_NAME}.images.${MACHINE}_${IMAGE_PACKAGE_NAME}</Name>
+    <SortingPriority>40</SortingPriority>
 </Package>
 EOF
 
