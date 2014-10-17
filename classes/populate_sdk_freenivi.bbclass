@@ -30,6 +30,7 @@ fakeroot generate_installer_package () {
     <Version>${INSTALLER_PACKAGE_VERSION}</Version>
     <ReleaseDate>${INSTALLER_PACKAGE_DATE}</ReleaseDate>
     <Name>${INSTALLER_PACKAGE_NAME}</Name>
+    <SortingPriority>70</SortingPriority>
 </Package>
 EOF
 

@@ -27,6 +27,7 @@ fakeroot generate_installer_package () {
     <Version>${INSTALLER_PACKAGE_VERSION}</Version>
     <ReleaseDate>${INSTALLER_PACKAGE_DATE}</ReleaseDate>
     <Name>${INSTALLER_PACKAGE_NAME}.images</Name>
+    <SortingPriority>40</SortingPriority>
 </Package>
 EOF
     fi
