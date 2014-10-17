@@ -16,7 +16,7 @@ EXTRA_USERS_PARAMS = " \
     usermod -p '\$1\$s2pp8yHi\$3N6qudJI2p2.qFqQ81qvK0' root; \
     "
 EMULATOR_QEMU_ARCH_qemuarm = "arm"
-EMULATOR_QEMU_qemuarm = "qemu-system-arm \ 
+EMULATOR_QEMU_qemuarm = "qemu-system-arm \
     -kernel ${KERNEL} \
     -hda ${ROOTFS} \
     -no-reboot \
@@ -77,7 +77,7 @@ EOF
 # get qemu path
 EMULATOR_TARGET_DIRECTORY="$(cd `dirname "${BASH_SOURCE[0]}"` && pwd)"
 SDK_SYSROOT_DIRECTORY="${EMULATOR_TARGET_DIRECTORY%/*}/sysroots/${SDK_ARCH}${SDK_VENDOR}-${SDK_OS}"
-QEMU="${SDK_SYSROOT_DIRECTORY}/usr/bin/qemu-system-${QEMU_ARCH}"
+QEMU_PATH="${SDK_SYSROOT_DIRECTORY}/usr/bin/"
 
 program=`basename "${BASH_SOURCE[0]}"`
 cmdline=`getopt -o G:K:M:S:h --long 3d:,kvm:,mem:,ssh:,help -- "$@"`
@@ -137,14 +137,14 @@ fi
 KERNEL=${EMULATOR_TARGET_DIRECTORY}/${EMULATOR_KERNEL}
 ROOTFS=${EMULATOR_TARGET_DIRECTORY}/${EMULATOR_ROOTFS}
 
-cmd="${EMULATOR_QEMU}"
+cmd="${QEMU_PATH}/${EMULATOR_QEMU}"
 
 echo $cmd
 
 eval "$cmd &"
 QEMU_PID=$!
 trap ">&2 echo 'Emulator stopped'; kill -9 ${QEMU_PID}" SIGTERM
-wait ${QEMU_PID}	
+wait ${QEMU_PID}
 
 EOF
     chmod +x ${INSTALLER_PACKAGE_DEPLOY_DIRECTORY}/${INSTALLER_PACKAGE_NAME}.emulator/data/SDK/${SDK_TARGET}/emulator/emulator
