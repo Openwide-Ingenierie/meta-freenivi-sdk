@@ -27,6 +27,8 @@ IMAGE_INSTALL += "weston weston-examples"
 #Install tools
 IMAGE_INSTALL += "connman-client"
 
+IMAGE_INSTALL += "autologin"
+
 #Add i915 mesa driver for x86 architecture
 IMAGE_INSTALL_append_x86 = " mesa-driver-i915 "
 IMAGE_INSTALL_append_x86-64 = " mesa-driver-i915 "
