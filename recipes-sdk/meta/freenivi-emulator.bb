@@ -9,6 +9,11 @@ inherit freenivi_emulator
 
 IMAGE_INSTALL += "autologin config"
 
+IMAGE_INSTALL += "qtquickcontrols-qmlplugins qtdeclarative-qmlplugins"
+
+# enable llvmpipe
+IMAGE_INSTALL += "mesa-driver-swrast libegl-gallium libgbm-gallium"
+
 IMAGE_INSTALL += "tzdata tzdata-europe"
 IMAGE_INSTALL += "avahi-utils"
 IMAGE_INSTALL += "procps"
@@ -29,8 +34,9 @@ IMAGE_INSTALL += "weston weston-examples"
 IMAGE_INSTALL += "connman-client"
 
 #Add i915 mesa driver for x86 architecture
-IMAGE_INSTALL_append_x86 = " mesa-driver-i915 "
-IMAGE_INSTALL_append_x86-64 = " mesa-driver-i915 "
+#IMAGE_INSTALL_append_x86 = " mesa-driver-i915 "
+#IMAGE_INSTALL_append_x86-64 = " mesa-driver-i915 "
+IMAGE_INSTALL_append_x86 = " mesa-driver-swrast"
 
 #QT Wayland
 IMAGE_INSTALL += "qtwayland qtwayland-plugins "
