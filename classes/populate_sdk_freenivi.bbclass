@@ -2,7 +2,9 @@ inherit populate_sdk populate_sdk_qt5
 
 # Override SDK_PACKAGE_FUNC variable to call our function instead of the
 # function "create_shar" defined in meta/class/do_populate_sdk_base.bbclass.
-SDK_PACKAGING_FUNC = "generate_installer_package"
+SDK_PACKAGING_FUNC = "do_nothing"
+do_nothing () {
+}
 
 SDK_TARGET = "${REAL_MULTIMACH_TARGET_SYS}"
 # SDK_TARGET_DEFAULT_DIRECTORY = "${SDKPATH}"
@@ -10,7 +12,8 @@ SDK_TARGET = "${REAL_MULTIMACH_TARGET_SYS}"
 # Create an installer-package for Qt installer-framework.
 # Note: the space before the '}' in the heredoc are here to avoid error with
 #       the bitbake parser.
-fakeroot generate_installer_package () {
+addtask generate_installer_package after do_populate_sdk before do_build
+fakeroot do_generate_installer_package () {
     INSTALLER_PACKAGE_DEPLOY_DIRECTORY="${DEPLOY_DIR}/installer-packages/"
     INSTALLER_PACKAGE_DISPLAY_NAME="${TUNE_PKGARCH}-${DISTRO}"
     INSTALLER_PACKAGE_NAME="${@'${TUNE_PKGARCH}'.replace('-', '_')}_${DISTRO}"

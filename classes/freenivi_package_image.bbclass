@@ -5,11 +5,8 @@ IMAGE_PACKAGE_NAME = "${IMAGE_LINK_NAME}"
 IMAGE_PACKAGE_ROOTFS = "${IMAGE_LINK_NAME}.ext3"
 IMAGE_PACKAGE_KERNEL = "${KERNEL_IMAGETYPE}"
 
-do_rootfs_append () {
-    bb.build.exec_func("generate_installer_package", d)
-}
-
-fakeroot generate_installer_package () {
+addtask generate_installer_package after do_rootfs before do_build
+fakeroot do_generate_installer_package () {
     INSTALLER_PACKAGE_DEPLOY_DIRECTORY="${DEPLOY_DIR}/installer-packages/"
     INSTALLER_PACKAGE_DISPLAY_NAME="${TUNE_PKGARCH}-${DISTRO}"
     INSTALLER_PACKAGE_NAME="${@'${TUNE_PKGARCH}'.replace('-', '_')}_${DISTRO}"

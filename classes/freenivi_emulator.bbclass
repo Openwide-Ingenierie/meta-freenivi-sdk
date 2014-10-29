@@ -42,11 +42,8 @@ EMULATOR_QEMU_qemux86 = "qemu-system-x86_64 \
     ${OPTIONS} \
     $@"
 
-do_rootfs_append () {
-    bb.build.exec_func("generate_installer_package", d)
-}
-
-fakeroot generate_installer_package () {
+addtask generate_installer_package after do_rootfs before do_build
+fakeroot do_generate_installer_package () {
     INSTALLER_PACKAGE_DEPLOY_DIRECTORY="${DEPLOY_DIR}/installer-packages/"
     INSTALLER_PACKAGE_DISPLAY_NAME="${TUNE_PKGARCH}-${DISTRO}"
     INSTALLER_PACKAGE_NAME="${@'${TUNE_PKGARCH}'.replace('-', '_')}_${DISTRO}"
