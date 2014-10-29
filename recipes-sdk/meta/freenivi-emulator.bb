@@ -53,3 +53,9 @@ IMAGE_INSTALL += "expedite perf"
 
 #Carrousel demo app
 IMAGE_INSTALL += "carrousel"
+
+python do_not_emulable () {
+    if not d.getVar("MACHINE","").startswith('qemu'):
+        bb.fatal("ERROR: Selected machine is not an emulator")
+}
+addtask not_emulable before do_fetch
