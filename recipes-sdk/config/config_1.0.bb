@@ -15,7 +15,7 @@ do_install_append () {
 SDK_EMULATOR_USER ?= "root"
 
 pkg_postinst_${PN} () {
-        mv /sdk/.profile ~${SDK_EMULATOR_USER}
+        cp /sdk/.profile ~${SDK_EMULATOR_USER}
 }
 
 PACKAGES = "${PN}"
