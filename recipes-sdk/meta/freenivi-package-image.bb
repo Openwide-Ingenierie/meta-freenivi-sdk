@@ -26,8 +26,9 @@ IMAGE_INSTALL += "weston weston-examples"
 
 #Install tools
 IMAGE_INSTALL += "connman-client"
+IMAGE_INSTALL += "openssh-sftp"
 
-IMAGE_INSTALL += "autologin"
+IMAGE_INSTALL += "autologin config"
 
 #Add i915 mesa driver for x86 architecture
 IMAGE_INSTALL_append_x86 = " mesa-driver-i915 "
