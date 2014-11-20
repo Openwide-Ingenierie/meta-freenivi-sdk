@@ -49,7 +49,7 @@ EMULATOR_QEMU_qemux86 = "qemu-system-x86_64 \
     -m ${MEMORY} \
     -vga vmware \
     -serial stdio \
-    -append 'vga=0 ip=dhcp console=ttyS0 console=tty1 uvesafb.mode_option=640x480-32 root=/dev/hda rw' \
+    -append 'vga=0 ip=dhcp console=ttyS0 console=tty1 uvesafb.mode_option=${RESOLUTION}-32 root=/dev/hda rw' \
     ${OPTIONS} \
     $@"
 
@@ -136,7 +136,7 @@ SDK_SYSROOT_DIRECTORY="${EMULATOR_TARGET_DIRECTORY%/*}/sysroots/${SDK_ARCH}${SDK
 QEMU_PATH="${SDK_SYSROOT_DIRECTORY}/usr/bin/"
 
 program=`basename "${BASH_SOURCE[0]}"`
-cmdline=`getopt -o G:K:M:S:h --long 3d:,kvm:,mem:,ssh:,help -- "$@"`
+cmdline=`getopt -o G:K:M:S:R:h --long 3d:,kvm:,mem:,ssh:res:,help -- "$@"`
 
 usage ()
 {
@@ -149,6 +149,7 @@ OPTIONS:
  -M|--mem <value>     set the VM memory capacity to <value>
  -S|--sshport <value> set the port to use for the ssh connection (must be a
                       free port of the host)
+ -R|--res <value>     set the emulator resolution (<width>x<heigth>)
  -h|--help            display this help
 EOT
  }
@@ -158,6 +159,7 @@ kvm_acceleration=0
 
 MEMORY=256
 SSHPORT=10022
+RESOLUTION="800x600"
 
 eval set -- "$cmdline"
 
@@ -167,6 +169,7 @@ while true ; do
         -K|--kvm) kvm_acceleration="$2"; shift 2;;
         -M|--mem) MEMORY="$2"; shift 2;;
         -S|--sshport) SSHPORT="$2"; shift 2;;
+        -R|--res) RESOLUTION="$2"; shift 2;;
         -h|--help) usage; exit;;
         --) shift; break;;
         *) echo "$program: unknown parameter '$1'"; usage; exit 1;;
