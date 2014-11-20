@@ -1,49 +1,80 @@
 inherit populate_sdk populate_sdk_qt5
 
-# Override SDK_PACKAGE_FUNC variable to call our function instead of the
-# function "create_shar" defined in meta/class/do_populate_sdk_base.bbclass.
-SDK_PACKAGING_FUNC = "do_nothing"
-do_nothing () {
-}
-
-SDK_TARGET = "${REAL_MULTIMACH_TARGET_SYS}"
-# SDK_TARGET_DEFAULT_DIRECTORY = "${SDKPATH}"
+FREENIVI_SDK_TARGET ?= "${DISTRO}/${REAL_MULTIMACH_TARGET_SYS}"
+FREENIVI_INSTALLER_PACKAGE_DEPLOY_DIR ?= "${DEPLOY_DIR}/installer-packages/"
 
 # Create an installer-package for Qt installer-framework.
 # Note: the space before the '}' in the heredoc are here to avoid error with
 #       the bitbake parser.
 addtask generate_installer_package after do_populate_sdk before do_build
 fakeroot do_generate_installer_package () {
-    INSTALLER_PACKAGE_DEPLOY_DIRECTORY="${DEPLOY_DIR}/installer-packages/"
-    INSTALLER_PACKAGE_DISPLAY_NAME="${TUNE_PKGARCH}-${DISTRO}"
-    INSTALLER_PACKAGE_NAME="${@'${TUNE_PKGARCH}'.replace('-', '_')}_${DISTRO}"
-    INSTALLER_PACKAGE_VERSION="${SDK_VERSION}"
-    INSTALLER_PACKAGE_DATE="$(date +%F)"
-
     # do_populate_sdk done previously a useless tarball.
     rm -f ${SDK_DEPLOY}/${TOOLCHAIN_OUTPUTNAME}.tar.bz2
 
-    # create node package ${INSTALLER_PACKAGE_NAME}
+    # generate ${DISTRO} node
+    INSTALLER_PACKAGE_DEPLOY_DIRECTORY="${FREENIVI_INSTALLER_PACKAGE_DEPLOY_DIR}"
+    INSTALLER_PACKAGE_DISPLAY_NAME="${DISTRO_NAME}"
+    INSTALLER_PACKAGE_NAME="${@'${DISTRO}'.replace('-', '_')}"
+    INSTALLER_PACKAGE_DESCRIPTION="${DISTRO_NAME} (version ${DISTRO_VERSION}) SDKs, images and emulators"
+    INSTALLER_PACKAGE_VERSION="${SDK_VERSION}"
+    INSTALLER_PACKAGE_DATE="$(date +%F)"
+    INSTALLER_PACKAGE_PRIORITY="70"
     mkdir -p ${INSTALLER_PACKAGE_DEPLOY_DIRECTORY}/${INSTALLER_PACKAGE_NAME}/meta/
     cat << EOF > ${INSTALLER_PACKAGE_DEPLOY_DIRECTORY}/${INSTALLER_PACKAGE_NAME}/meta/package.xml
 <?xml version="1.0" encoding="UTF-8"?>
 <Package>
     <DisplayName>${INSTALLER_PACKAGE_DISPLAY_NAME}</DisplayName>
-    <Description>${DISTRO_NAME} tools for target ${TUNE_PKGARCH}-${DISTRO} version ${DISTRO_VERSION}</Description>
+    <Description>${INSTALLER_PACKAGE_DESCRIPTION}</Description>
     <Version>${INSTALLER_PACKAGE_VERSION}</Version>
     <ReleaseDate>${INSTALLER_PACKAGE_DATE}</ReleaseDate>
     <Name>${INSTALLER_PACKAGE_NAME}</Name>
-    <SortingPriority>70</SortingPriority>
+    <SortingPriority>${INSTALLER_PACKAGE_PRIORITY}</SortingPriority>
 </Package>
 EOF
 
-    # create sdk package ${INSTALLER_PACKAGE_NAME}.sdk
-    mkdir -p ${INSTALLER_PACKAGE_DEPLOY_DIRECTORY}/${INSTALLER_PACKAGE_NAME}.sdk/data/SDK/${SDK_TARGET}
-    ## copy sdk files
-    cp -r ${SDK_OUTPUT}/${SDKPATH}/* ${INSTALLER_PACKAGE_DEPLOY_DIRECTORY}/${INSTALLER_PACKAGE_NAME}.sdk/data/SDK/${SDK_TARGET}
-    mkdir -p ${INSTALLER_PACKAGE_DEPLOY_DIRECTORY}/${INSTALLER_PACKAGE_NAME}.sdk/meta/
-    ## create installation script
-    cat << EOF > ${INSTALLER_PACKAGE_DEPLOY_DIRECTORY}/${INSTALLER_PACKAGE_NAME}.sdk/meta/installscript.js
+    # generate ${DISTRO}/${REAL_MULTIMACH_TARGET_SYS} node
+    INSTALLER_PACKAGE_DEPLOY_DIRECTORY="${FREENIVI_INSTALLER_PACKAGE_DEPLOY_DIR}"
+    INSTALLER_PACKAGE_DISPLAY_NAME="${REAL_MULTIMACH_TARGET_SYS}"
+    INSTALLER_PACKAGE_NAME="${@'${DISTRO}.${REAL_MULTIMACH_TARGET_SYS}'.replace('-', '_')}"
+    INSTALLER_PACKAGE_DESCRIPTION="${DISTRO_NAME} SDKs and images, and emulator for ${REAL_MULTIMACH_TARGET_SYS}"
+    INSTALLER_PACKAGE_VERSION="${SDK_VERSION}"
+    INSTALLER_PACKAGE_DATE="$(date +%F)"
+    INSTALLER_PACKAGE_PRIORITY="70"
+    mkdir -p ${INSTALLER_PACKAGE_DEPLOY_DIRECTORY}/${INSTALLER_PACKAGE_NAME}/meta/
+    cat << EOF > ${INSTALLER_PACKAGE_DEPLOY_DIRECTORY}/${INSTALLER_PACKAGE_NAME}/meta/package.xml
+<?xml version="1.0" encoding="UTF-8"?>
+<Package>
+    <DisplayName>${INSTALLER_PACKAGE_DISPLAY_NAME}</DisplayName>
+    <Description>${INSTALLER_PACKAGE_DESCRIPTION}</Description>
+    <Version>${INSTALLER_PACKAGE_VERSION}</Version>
+    <ReleaseDate>${INSTALLER_PACKAGE_DATE}</ReleaseDate>
+    <Name>${INSTALLER_PACKAGE_NAME}</Name>
+    <SortingPriority>${INSTALLER_PACKAGE_PRIORITY}</SortingPriority>
+</Package>
+EOF
+
+    # generate ${DISTRO}/${REAL_MULTIMACH_TARGET_SYS} SDK package
+    INSTALLER_PACKAGE_DEPLOY_DIRECTORY="${FREENIVI_INSTALLER_PACKAGE_DEPLOY_DIR}"
+    INSTALLER_PACKAGE_DISPLAY_NAME="SDK"
+    INSTALLER_PACKAGE_NAME="${@'${DISTRO}.${REAL_MULTIMACH_TARGET_SYS}.sdk'.replace('-', '_')}"
+    INSTALLER_PACKAGE_DESCRIPTION="${DISTRO_NAME} SDK for ${REAL_MULTIMACH_TARGET_SYS}"
+    INSTALLER_PACKAGE_VERSION="${SDK_VERSION}"
+    INSTALLER_PACKAGE_DATE="$(date +%F)"
+    INSTALLER_PACKAGE_PRIORITY="100"
+    mkdir -p ${INSTALLER_PACKAGE_DEPLOY_DIRECTORY}/${INSTALLER_PACKAGE_NAME}/meta/
+    cat << EOF > ${INSTALLER_PACKAGE_DEPLOY_DIRECTORY}/${INSTALLER_PACKAGE_NAME}/meta/package.xml
+<?xml version="1.0" encoding="UTF-8"?>
+<Package>
+    <DisplayName>${INSTALLER_PACKAGE_DISPLAY_NAME}</DisplayName>
+    <Description>${INSTALLER_PACKAGE_DESCRIPTION}</Description>
+    <Version>${INSTALLER_PACKAGE_VERSION}</Version>
+    <ReleaseDate>${INSTALLER_PACKAGE_DATE}</ReleaseDate>
+    <Name>${INSTALLER_PACKAGE_NAME}</Name>
+    <Script>installscript.js</Script>
+    <SortingPriority>${INSTALLER_PACKAGE_PRIORITY}</SortingPriority>
+</Package>
+EOF
+    cat << EOF > ${INSTALLER_PACKAGE_DEPLOY_DIRECTORY}/${INSTALLER_PACKAGE_NAME}/meta/installscript.js
 function Component()
 {
     gui.pageWidgetByObjectName("ReadyForInstallationPage").left.connect(Component.prototype.readyToInstall);
@@ -65,40 +96,28 @@ Component.prototype.createOperations = function()
 {
     component.createOperations();
 
-    component.addOperation("Execute", "@TargetDir@/SDK/${SDK_TARGET}/setup-sdk.sh");
+    component.addOperation("Execute", "@TargetDir@/SDK/${FREENIVI_SDK_TARGET}/setup-sdk.sh");
 
     if (installer.componentByName("qt_creator").installationRequested() ||
         installer.componentByName("qt_creator").isInstalled())
         component.addOperation(
-            "Execute", "@TargetDir@/SDK/${SDK_TARGET}/add-kit.sh", "@TargetDir@/QtCreator/bin/sdktool",
-            "UNDOEXECUTE", "@TargetDir@/SDK/${SDK_TARGET}/del-kit.sh", "@TargetDir@/QtCreator/bin/sdktool"
+            "Execute", "@TargetDir@/SDK/${FREENIVI_SDK_TARGET}/add-kit.sh", "@TargetDir@/QtCreator/bin/sdktool",
+            "UNDOEXECUTE", "@TargetDir@/SDK/${FREENIVI_SDK_TARGET}/del-kit.sh", "@TargetDir@/QtCreator/bin/sdktool"
         );
  }
 EOF
-    # create sdk package meta information
-    cat << EOF > ${INSTALLER_PACKAGE_DEPLOY_DIRECTORY}/${INSTALLER_PACKAGE_NAME}.sdk/meta/package.xml
-<?xml version="1.0" encoding="UTF-8"?>
-<Package>
-    <DisplayName>SDK</DisplayName>
-    <Description>${DISTRO_NAME} SDK for target ${TUNE_PKGARCH}-${DISTRO} version ${DISTRO_VERSION}</Description>
-    <Version>${INSTALLER_PACKAGE_VERSION}</Version>
-    <ReleaseDate>${INSTALLER_PACKAGE_DATE}</ReleaseDate>
-    <Name>${INSTALLER_PACKAGE_NAME}.sdk</Name>
-    <Script>installscript.js</Script>
-    <SortingPriority>70</SortingPriority>
-</Package>
-EOF
-
-    # create the file that store the default install direcotory
-    echo "${SDKPATH}" > ${INSTALLER_PACKAGE_DEPLOY_DIRECTORY}/${INSTALLER_PACKAGE_NAME}.sdk/data/SDK/${SDK_TARGET}/last-install-directory
-
-    # create setup script for sdk (normally done by the auto-extractible archive)
-    cat << "EOF" > ${INSTALLER_PACKAGE_DEPLOY_DIRECTORY}/${INSTALLER_PACKAGE_NAME}.sdk/data/SDK/${SDK_TARGET}/setup-sdk.sh
+    mkdir -p ${INSTALLER_PACKAGE_DEPLOY_DIRECTORY}/${INSTALLER_PACKAGE_NAME}/data/SDK/${FREENIVI_SDK_TARGET}
+    ## copy sdk files
+    cp -r ${SDK_OUTPUT}/${SDKPATH}/* ${INSTALLER_PACKAGE_DEPLOY_DIRECTORY}/${INSTALLER_PACKAGE_NAME}/data/SDK/${FREENIVI_SDK_TARGET}
+    ## create the file that store the last install direcotory with the default install directory
+    echo "${SDKPATH}" > ${INSTALLER_PACKAGE_DEPLOY_DIRECTORY}/${INSTALLER_PACKAGE_NAME}/data/SDK/${FREENIVI_SDK_TARGET}/last-install-directory
+    ## create setup script for sdk (normally done by the auto-extractible archive)
+    cat << "EOF" > ${INSTALLER_PACKAGE_DEPLOY_DIRECTORY}/${INSTALLER_PACKAGE_NAME}/data/SDK/${FREENIVI_SDK_TARGET}/setup-sdk.sh
 #! /bin/bash
 
 SDK_TARGET_DIRECTORY="$(cd $(dirname $(readlink -f $0)) && pwd)"
 SDK_DEFAULT_TARGET_DIRECTORY="$(cat ${SDK_TARGET_DIRECTORY}/last-install-directory)"
-SDK_ENV_SETUP_SCRIPT="${SDK_TARGET_DIRECTORY}/environment-setup-${SDK_TARGET}"
+SDK_ENV_SETUP_SCRIPT="${SDK_TARGET_DIRECTORY}/environment-setup-${REAL_MULTIMACH_TARGET_SYS}"
 REPLACES="s:${SDK_DEFAULT_TARGET_DIRECTORY}:${SDK_TARGET_DIRECTORY}:g"
 
 # fix environment paths
@@ -147,7 +166,7 @@ source ${SDK_ENV_SETUP_SCRIPT}
 # We need to create a new MKSPEC for the installed SDK without environment
 # variables
 
-# Set OE_QMAKE_COMPILER as environment-setup-${SDK_TARGET} does
+# Set OE_QMAKE_COMPILER as environment-setup-${REAL_MULTIMACH_TARGET_SYS} does
 # not set it
 OE_QMAKE_COMPILER=gcc
 
@@ -189,14 +208,13 @@ for VAR in $VARLIST; do
     sed -i "s%\($VAR *= *\)$VALUE%\1$ABSOLUTE_VALUE%" "$MKSPEC_PATH/qmake.conf"
 done
 
-echo "${SDK_DEFAULT_TARGET_DIRECTORY}" > ${SDK_TARGET_DIRECTORY}/last-install-directory
+echo "${SDK_TARGET_DIRECTORY}" > ${SDK_TARGET_DIRECTORY}/last-install-directory
 
 exit 0
 EOF
-    chmod +x  ${INSTALLER_PACKAGE_DEPLOY_DIRECTORY}/${INSTALLER_PACKAGE_NAME}.sdk/data/SDK/${SDK_TARGET}/setup-sdk.sh
-
-   # create script that add a kit of the SDK to Qt Creator
-    cat << "EOF" > ${INSTALLER_PACKAGE_DEPLOY_DIRECTORY}/${INSTALLER_PACKAGE_NAME}.sdk/data/SDK/${SDK_TARGET}/add-kit.sh
+    chmod +x  ${INSTALLER_PACKAGE_DEPLOY_DIRECTORY}/${INSTALLER_PACKAGE_NAME}/data/SDK/${FREENIVI_SDK_TARGET}/setup-sdk.sh
+    ## create script that add a kit of the SDK to Qt Creator
+    cat << "EOF" > ${INSTALLER_PACKAGE_DEPLOY_DIRECTORY}/${INSTALLER_PACKAGE_NAME}/data/SDK/${FREENIVI_SDK_TARGET}/add-kit.sh
 #! /bin/bash
 
 if [ "$1" == "-h" -o "$1" == "--help" ]; then
@@ -218,34 +236,32 @@ if [ -z "$SDKTOOL" ]; then
 fi
 
 # export PATH for the command `command'
-source ${SDK_TARGET_DIRECTORY}/environment-setup-${SDK_TARGET}
+source ${SDK_TARGET_DIRECTORY}/environment-setup-${REAL_MULTIMACH_TARGET_SYS}
 
 BASE_ID="${DISTRO_NAME}_"
 BASE_NAME="${DISTRO_NAME}"
 
 QTVERSION=qmake
-QTVERSION_ID=${BASE_ID}QT5-${SDK_TARGET}
-QTVERSION_NAME="Qt5 for ${BASE_NAME} (${SDK_TARGET})"
+QTVERSION_ID=${BASE_ID}QT5-${REAL_MULTIMACH_TARGET_SYS}
+QTVERSION_NAME="Qt5 for ${BASE_NAME} (${REAL_MULTIMACH_TARGET_SYS})"
 QTVERSION_PATH=$(command -v $QTVERSION)
 
 DEBUGGER=${TARGET_PREFIX}gdb
-DEBUGGER_ID=${BASE_ID}GDB-${SDK_TARGET}
-DEBUGGER_NAME="GDB for ${BASE_NAME} (${SDK_TARGET})"
+DEBUGGER_ID=${BASE_ID}GDB-${REAL_MULTIMACH_TARGET_SYS}
+DEBUGGER_NAME="GDB for ${BASE_NAME} (${REAL_MULTIMACH_TARGET_SYS})"
 DEBUGGER_PATH=$(command -v $DEBUGGER)
 
 TOOLCHAIN=${TARGET_PREFIX}g++
-TOOLCHAIN_ID=${BASE_ID}G++-${SDK_TARGET}
+TOOLCHAIN_ID=${BASE_ID}G++-${REAL_MULTIMACH_TARGET_SYS}
 # Toolchain IDs need a prefix
 TOOLCHAIN_PREFIX=ProjectExplorer.ToolChain.Gcc
-TOOLCHAIN_NAME="G++ for ${BASE_NAME} (${SDK_TARGET})"
+TOOLCHAIN_NAME="G++ for ${BASE_NAME} (${REAL_MULTIMACH_TARGET_SYS})"
 TOOLCHAIN_PATH=$(command -v $TOOLCHAIN)
 
-KIT_ID=${BASE_ID}KIT-${SDK_TARGET}
-KIT_NAME="${BASE_NAME} (${SDK_TARGET})"
+KIT_ID=${BASE_ID}KIT-${REAL_MULTIMACH_TARGET_SYS}
+KIT_NAME="${BASE_NAME} (${REAL_MULTIMACH_TARGET_SYS})"
 
 MKSPEC="linux-${DISTRO}-g++"
-
-echo "Adding ${DISTRO_NAME} kit for ${SDK_TARGET}..."
 
 ####################################[ ABI ]#####################################
 
@@ -413,14 +429,13 @@ if [ $error_code -ne 0 ]; then
     exit $error_code
 fi
 
-echo "${DISTRO_NAME} kit for ${SDK_TARGET} has been successfully added."
+echo "${DISTRO_NAME} kit for ${REAL_MULTIMACH_TARGET_SYS} has been successfully added."
 
 exit 0
 EOF
-    chmod +x  ${INSTALLER_PACKAGE_DEPLOY_DIRECTORY}/${INSTALLER_PACKAGE_NAME}.sdk/data/SDK/${SDK_TARGET}/add-kit.sh
-
-   # create script that remove a kit of the SDK from Qt Creator
-    cat << "EOF" > ${INSTALLER_PACKAGE_DEPLOY_DIRECTORY}/${INSTALLER_PACKAGE_NAME}.sdk/data/SDK/${SDK_TARGET}/del-kit.sh
+    chmod +x  ${INSTALLER_PACKAGE_DEPLOY_DIRECTORY}/${INSTALLER_PACKAGE_NAME}/data/SDK/${FREENIVI_SDK_TARGET}/add-kit.sh
+    ## create script that remove a kit of the SDK from Qt Creator
+    cat << "EOF" > ${INSTALLER_PACKAGE_DEPLOY_DIRECTORY}/${INSTALLER_PACKAGE_NAME}/data/SDK/${FREENIVI_SDK_TARGET}/del-kit.sh
 #! /bin/bash
 
 if [ $# -gt 0 ]; then
@@ -438,14 +453,14 @@ if [ -z "$SDKTOOL" ]; then
     exit 2
 fi
 
-echo "Adding ${DISTRO_NAME} kit for ${SDK_TARGET}..."
+echo "Adding ${DISTRO_NAME} kit for ${REAL_MULTIMACH_TARGET_SYS}..."
 
 BASE_ID=${DISTRO_NAME}_
-TOOLCHAIN_ID=${BASE_ID}G++-${SDK_TARGET}
+TOOLCHAIN_ID=${BASE_ID}G++-${REAL_MULTIMACH_TARGET_SYS}
 TOOLCHAIN_PREFIX=ProjectExplorer.ToolChain.Gcc
-DEBUGGER_ID=${BASE_ID}GDB-${SDK_TARGET}
-QTVERSION_ID=${BASE_ID}QT5-${SDK_TARGET}
-KIT_ID=${BASE_ID}KIT-${SDK_TARGET}
+DEBUGGER_ID=${BASE_ID}GDB-${REAL_MULTIMACH_TARGET_SYS}
+QTVERSION_ID=${BASE_ID}QT5-${REAL_MULTIMACH_TARGET_SYS}
+KIT_ID=${BASE_ID}KIT-${REAL_MULTIMACH_TARGET_SYS}
 
 echo "Removing ..."
 
@@ -454,10 +469,10 @@ $SDKTOOL rmTC --id "$TOOLCHAIN_PREFIX:$TOOLCHAIN_ID"
 $SDKTOOL rmDebugger --id "$DEBUGGER_ID"
 $SDKTOOL rmQt --id "$QTVERSION_ID"
 
-echo "${DISTRO_NAME} kit for ${SDK_TARGET} has been successfully removed."
+echo "${DISTRO_NAME} kit for ${REAL_MULTIMACH_TARGET_SYS} has been successfully removed."
 
 exit 0
 
 EOF
-    chmod +x  ${INSTALLER_PACKAGE_DEPLOY_DIRECTORY}/${INSTALLER_PACKAGE_NAME}.sdk/data/SDK/${SDK_TARGET}/del-kit.sh
+    chmod +x  ${INSTALLER_PACKAGE_DEPLOY_DIRECTORY}/${INSTALLER_PACKAGE_NAME}/data/SDK/${FREENIVI_SDK_TARGET}/del-kit.sh
 }
