@@ -13,8 +13,6 @@ IMAGE_INSTALL += "qtbase \
                   qtquickcontrols-qmlplugins \
                   qtdeclarative-qmlplugins \
                   "
-# software graphic acceleration
-IMAGE_INSTALL += "mesa-driver-swrast libegl-gallium libgbm-gallium"
 
 # set password to freenivi (obtained by "openssl passwd -1 freenivi) 
 inherit extrausers
@@ -26,8 +24,8 @@ EXTRA_USERS_PARAMS = " \
 EMULATOR_ROOTFS = "${IMAGE_LINK_NAME}.ext3"
 EMULATOR_KERNEL = "${KERNEL_IMAGETYPE}"
 
-EMULATOR_QEMU_ARCH_qemuarm = "arm"
-EMULATOR_QEMU_qemuarm = "qemu-system-arm \
+EMULATOR_QEMU_ARCH_emulator-arm = "arm"
+EMULATOR_QEMU_emulator-arm = "qemu-system-arm \
     -kernel ${KERNEL} \
     -hda ${ROOTFS} \
     -no-reboot \
@@ -39,8 +37,8 @@ EMULATOR_QEMU_qemuarm = "qemu-system-arm \
     -net user,hostfwd=tcp::${SSHPORT}-:22 \
     ${OPTIONS} \
     $@"
-EMULATOR_QEMU_qemux86 = "x86_64"
-EMULATOR_QEMU_qemux86 = "qemu-system-x86_64 \
+EMULATOR_QEMU_emulator-x86 = "x86_64"
+EMULATOR_QEMU_emulator-x86 = "qemu-system-x86_64 \
     -kernel ${KERNEL} \
     -hda ${ROOTFS} \
     -netdev user,id=freenivi,hostfwd=tcp::${SSHPORT}-:22 \
@@ -56,7 +54,7 @@ EMULATOR_QEMU_qemux86 = "qemu-system-x86_64 \
 # check if MACHINE is an emulator (quit otherwise)
 addtask not_emulable before do_fetch
 python do_not_emulable () {
-    if not d.getVar("MACHINE","").startswith('qemu'):
+    if not d.getVar("MACHINE","").startswith('emulator'):
         bb.fatal("ERROR: Selected machine is not an emulator")
 }
 
