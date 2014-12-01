@@ -1,0 +1,12 @@
+diff --git a/CMakeLists.txt b/CMakeLists.txt
+index 10d6476..92bb667 100644
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -160,3 +160,7 @@ add_subdirectory(EGL)
+ add_subdirectory(GLES_common)
+ add_subdirectory(GLESv1_CM)
+ add_subdirectory(GLESv2)
++install(
++    DIRECTORY include/EGL include/GL include/GLES include/GLES2 include/GLES3 include/KHR
++    DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
++)

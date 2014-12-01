@@ -42,7 +42,7 @@ index 10d6476..08f5ae7 100644
 +++ b/CMakeLists.txt
 @@ -89,11 +89,6 @@ if (PLATFORM_X11)
  endif ()
- 
+
  if (PLATFORM_GBM)
 -    pkg_check_modules(GBM REQUIRED gbm)
 -
@@ -50,7 +50,7 @@ index 10d6476..08f5ae7 100644
 -    include_directories(${GBM_INCLUDE_DIRS})
 -
      pkg_check_modules(LIBUDEV REQUIRED libudev)
- 
+
      add_definitions(${LIBUDEV_CFLAGS})
 diff --git a/EGL/CMakeLists.txt b/EGL/CMakeLists.txt
 index 2aea772..a4239cf 100644
@@ -65,7 +65,7 @@ index 2aea772..a4239cf 100644
 +INSTALL(FILES
 +    ${CMAKE_BINARY_DIR}/EGL/egl.pc
 +    DESTINATION
-+    ${INSTALL_LIB_DIR}/pkgconfig
++    ${CMAKE_INSTALL_LIBDIR}/pkgconfig
 +    )
 diff --git a/EGL/egl.pc.in b/EGL/egl.pc.in
 new file mode 100644
@@ -75,7 +75,7 @@ index 0000000..6fb5ecc
 @@ -0,0 +1,12 @@
 +prefix=@CMAKE_INSTALL_PREFIX@
 +exec_prefix=${prefix}
-+libdir=@LIB_INSTALL_DIR@
++libdir=@CMAKE_INSTALL_LIBDIR@
 +includedir=${prefix}/include
 +
 +Name: libEGL
@@ -84,7 +84,7 @@ index 0000000..6fb5ecc
 +Version: 10.1.3
 +Requires:
 +Libs: -L${libdir} -lEGL
-+Cflags: -I${includedir}
++Cflags: -I${includedir} @EGL_PC_CFLAGS@
 diff --git a/GLESv1_CM/CMakeLists.txt b/GLESv1_CM/CMakeLists.txt
 index 4c3bc70..6042351 100644
 --- a/GLESv1_CM/CMakeLists.txt
@@ -98,7 +98,7 @@ index 4c3bc70..6042351 100644
 +INSTALL(FILES
 +    ${CMAKE_BINARY_DIR}/GLESv1_CM/glesv1_cm.pc
 +    DESTINATION
-+    ${INSTALL_LIB_DIR}/pkgconfig
++    ${CMAKE_INSTALL_LIBDIR}/pkgconfig
 +    )
 diff --git a/GLESv1_CM/glesv1_cm.pc.in b/GLESv1_CM/glesv1_cm.pc.in
 new file mode 100644
@@ -108,7 +108,7 @@ index 0000000..5c7badc
 @@ -0,0 +1,12 @@
 +prefix=@CMAKE_INSTALL_PREFIX@
 +exec_prefix=${prefix}
-+libdir=@LIB_INSTALL_DIR@
++libdir=@CMAKE_INSTALL_LIBDIR@
 +includedir=${prefix}/include
 +
 +Name: libglesv1_cm
@@ -131,7 +131,7 @@ index 835b1bd..c45936a 100644
 +INSTALL(FILES
 +    ${CMAKE_BINARY_DIR}/GLESv2/glesv2.pc
 +    DESTINATION
-+    ${INSTALL_LIB_DIR}/pkgconfig
++    ${CMAKE_INSTALL_LIBDIR}/pkgconfig
 +    )
 diff --git a/GLESv2/glesv2.pc.in b/GLESv2/glesv2.pc.in
 new file mode 100644
@@ -141,7 +141,7 @@ index 0000000..70fa1d8
 @@ -0,0 +1,12 @@
 +prefix=@CMAKE_INSTALL_PREFIX@
 +exec_prefix=${prefix}
-+libdir=@LIB_INSTALL_DIR@
++libdir=@CMAKE_INSTALL_LIBDIR@
 +includedir=${prefix}/include
 +
 +Name: libGLESv2
@@ -164,10 +164,10 @@ index 90c6390..eb6ccd8 100644
 +INSTALL(FILES
 +    ${CMAKE_BINARY_DIR}/gbm/gbm.pc
 +    DESTINATION
-+    ${INSTALL_LIB_DIR}/pkgconfig
++    ${CMAKE_INSTALL_LIBDIR}/pkgconfig
 +    )
 +INSTALL(FILES
-+    ${CMAKE_BINARY_DIR}/include/gbm.h
++    ${CMAKE_SOURCE_DIR}/include/gbm.h
 +    DESTINATION ${CMAKE_INSTALL_PREFIX}/include
 +    )
 diff --git a/gbm/gbm.pc.in b/gbm/gbm.pc.in
@@ -178,7 +178,7 @@ index 0000000..6f376ff
 @@ -0,0 +1,12 @@
 +prefix=@CMAKE_INSTALL_PREFIX@
 +exec_prefix=${prefix}
-+libdir=@LIB_INSTALL_DIR@
++libdir=@CMAKE_INSTALL_LIBDIR@
 +includedir=${prefix}/include
 +
 +Name: libgbm
@@ -267,7 +267,7 @@ index 0000000..9d2a030
 +/** Format of the allocated buffer */
 +enum gbm_bo_format {
 +   /** RGB with 8 bits per channel in a 32 bit value */
-+   GBM_BO_FORMAT_XRGB8888, 
++   GBM_BO_FORMAT_XRGB8888,
 +   /** ARGB with 8 bits per channel in a 32 bit value */
 +   GBM_BO_FORMAT_ARGB8888
 +};
@@ -491,12 +491,12 @@ index 6825b52..4055d30 100644
 --- a/include/yagl_gbm.h
 +++ b/include/yagl_gbm.h
 @@ -3,7 +3,7 @@
- 
+
  #include "yagl_export.h"
  #include "yagl_types.h"
 -#include <gbm.h>
 +#include "gbm.h"
- 
+
  struct vigs_drm_device;
  struct vigs_drm_surface;
 diff --git a/wayland-egl/CMakeLists.txt b/wayland-egl/CMakeLists.txt
@@ -512,7 +512,7 @@ index fe7ae74..3641683 100644
 +INSTALL(FILES
 +    ${CMAKE_BINARY_DIR}/wayland-egl/wayland-egl.pc
 +    DESTINATION
-+    ${INSTALL_LIB_DIR}/pkgconfig
++    ${CMAKE_INSTALL_LIBDIR}/pkgconfig
 +    )
 diff --git a/wayland-egl/wayland-egl.pc.in b/wayland-egl/wayland-egl.pc.in
 new file mode 100644
@@ -522,7 +522,7 @@ index 0000000..669879d
 @@ -0,0 +1,12 @@
 +prefix=@CMAKE_INSTALL_PREFIX@
 +exec_prefix=${prefix}
-+libdir=@LIB_INSTALL_DIR@
++libdir=@CMAKE_INSTALL_LIBDIR@
 +includedir=${prefix}/include
 +
 +Name: libwayland-egl
@@ -532,6 +532,5 @@ index 0000000..669879d
 +Requires:
 +Libs: -L${libdir} -lwayland-egl
 +Cflags: -I${includedir}
--- 
+--
 1.8.4.5
-

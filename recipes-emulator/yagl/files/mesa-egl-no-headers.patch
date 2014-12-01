@@ -1,0 +1,25 @@
+diff --git a/CMakeLists.txt b/CMakeLists.txt
+index 10d6476..b3eca8d 100644
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -42,10 +42,6 @@ endif ()
+ 
+ set(YAGL_OUT_DIR ${YAGL_BINARY_DIR}/out)
+ 
+-#define stuff
+-
+-add_definitions(-DMESA_EGL_NO_X11_HEADERS)
+-
+ #set includes/libs
+ 
+ set(YAGL_INCLUDE_DIR "${YAGL_SOURCE_DIR}/include")
+@@ -86,6 +82,9 @@ if (PLATFORM_X11)
+     add_definitions(${XFIXES_CFLAGS})
+     include_directories(${XFIXES_INCLUDE_DIRS})
+     link_directories(${XFIXES_LIBRARY_DIRS})
++else ()
++    add_definitions(-DMESA_EGL_NO_X11_HEADERS)
++    set(EGL_PC_CFLAGS -DMESA_EGL_NO_X11_HEADERS)
+ endif ()
+ 
+ if (PLATFORM_GBM)

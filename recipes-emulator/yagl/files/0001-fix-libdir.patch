@@ -1,0 +1,77 @@
+diff --git a/CMakeLists.txt b/CMakeLists.txt
+index 10d6476..c4a72ec 100644
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -30,8 +30,6 @@ option(PLATFORM_X11 "Enable X11 platform" TRUE)
+ option(PLATFORM_GBM "Enable GBM platform" FALSE)
+ option(PLATFORM_WAYLAND "Enable wayland platform" FALSE)
+ 
+-set(INSTALL_LIB_DIR "lib" CACHE STRING "Where to install library files")
+-
+ # END USER SETTINGS
+ 
+ if ((NOT PLATFORM_X11) AND (NOT PLATFORM_GBM) AND (NOT PLATFORM_WAYLAND))
+@@ -147,7 +145,7 @@ message(STATUS "Wayland platform: no")
+ endif ()
+ 
+ message(STATUS "Install prefix:   " ${CMAKE_INSTALL_PREFIX})
+-message(STATUS "Install lib dir:  " ${INSTALL_LIB_DIR})
++message(STATUS "Install lib dir:  " ${CMAKE_INSTALL_LIBDIR})
+ 
+ if (PLATFORM_WAYLAND)
+ add_subdirectory(wayland-egl)
+diff --git a/wayland-egl/CMakeLists.txt b/wayland-egl/CMakeLists.txt
+index fe7ae74..7c10df8 100644
+--- a/wayland-egl/CMakeLists.txt
++++ b/wayland-egl/CMakeLists.txt
+@@ -10,5 +10,5 @@ target_link_libraries(wayland-egl-yagl ${CMAKE_THREAD_LIBS_INIT})
+ 
+ install(
+     TARGETS wayland-egl-yagl
+-    LIBRARY DESTINATION ${INSTALL_LIB_DIR}
++    LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
+ )
+diff --git a/gbm/CMakeLists.txt b/gbm/CMakeLists.txt
+index 90c6390..f4c0af9 100644
+--- a/gbm/CMakeLists.txt
++++ b/gbm/CMakeLists.txt
+@@ -23,5 +23,5 @@ target_link_libraries(gbm-yagl ${LIBRARIES})
+ 
+ install(
+     TARGETS gbm-yagl
+-    LIBRARY DESTINATION ${INSTALL_LIB_DIR}
++    LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
+ )
+diff --git a/EGL/CMakeLists.txt b/EGL/CMakeLists.txt
+index 2aea772..c5ba389 100644
+--- a/EGL/CMakeLists.txt
++++ b/EGL/CMakeLists.txt
+@@ -98,5 +98,5 @@ target_link_libraries(EGL ${LIBRARIES})
+ 
+ install(
+     TARGETS EGL
+-    LIBRARY DESTINATION ${INSTALL_LIB_DIR}
++    LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
+ )
+diff --git a/GLESv1_CM/CMakeLists.txt b/GLESv1_CM/CMakeLists.txt
+index 4c3bc70..668ba7c 100644
+--- a/GLESv1_CM/CMakeLists.txt
++++ b/GLESv1_CM/CMakeLists.txt
+@@ -16,5 +16,5 @@ target_link_libraries(GLESv1_CM "-Wl,-whole-archive" GLES_common "-Wl,-no-whole-
+ 
+ install(
+     TARGETS GLESv1_CM
+-    LIBRARY DESTINATION ${INSTALL_LIB_DIR}
++    LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
+ )
+diff --git a/GLESv2/CMakeLists.txt b/GLESv2/CMakeLists.txt
+index 835b1bd..7d6347a 100644
+--- a/GLESv2/CMakeLists.txt
++++ b/GLESv2/CMakeLists.txt
+@@ -37,5 +37,5 @@ target_link_libraries(GLESv2 "-Wl,-whole-archive" GLES_common "-Wl,-no-whole-arc
+ 
+ install(
+     TARGETS GLESv2
+-    LIBRARY DESTINATION ${INSTALL_LIB_DIR}
++    LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
+ )
