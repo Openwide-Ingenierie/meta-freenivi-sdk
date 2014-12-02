@@ -28,7 +28,7 @@ new file mode 100644
 index 0000000..6818d9f
 --- /dev/null
 +++ b/drivers/gpu/drm/vigs/Kconfig
-@@ -0,0 +1,23 @@
+@@ -0,0 +1,24 @@
 +#
 +# VIGS configuration
 +#
@@ -37,6 +37,7 @@ index 0000000..6818d9f
 +	tristate "DRM Support for VIGS"
 +	depends on DRM && PCI
 +	select DRM_KMS_HELPER
++       select DRM_KMS_FB_HELPER
 +	select DRM_TTM
 +	select FB_CFB_FILLRECT
 +	select FB_CFB_COPYAREA
