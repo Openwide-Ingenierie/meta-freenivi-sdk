@@ -25,16 +25,16 @@ EMULATOR_ROOTFS ?= "${IMAGE_LINK_NAME}.ext3"
 EMULATOR_KERNEL ?= "${KERNEL_IMAGETYPE}"
 
 EMULATOR_KERNEL_CMDLINE ?= " \
-    root=/dev/hda rw \
     ip=dhcp \
-    console=ttyS0 console=tty1 \
+    console=tty1 \
     uvesafb.mode_option=${RESOLUTION}-32 \
+    video=LVDS-1:${RESOLUTION}-32@60 \
 "
 
 EMULATOR_QEMU_OPTIONS ?= " \
     -kernel ${KERNEL} \
     -hda ${ROOTFS} \
-    -vga vmware \
+    -m ${MEMORY} \
     -display sdl \
     -soundhw all \
     -serial stdio \
@@ -43,8 +43,13 @@ EMULATOR_QEMU_OPTIONS ?= " \
 
 EMULATOR_QEMU_emulator-x86 = "qemu-system-i386"
 EMULATOR_QEMU_OPTIONS_append_emulator-x86 = " \
+    -vga vmware \
     -device e1000,netdev=freenivi \
     -netdev user,id=freenivi,hostfwd=tcp::${SSHPORT}-:22 \
+"
+EMULATOR_KERNEL_CMDLINE_append_emulator-x86 = " \
+    root=/dev/hda rw \
+    console=ttyS0 \
 "
 
 EMULATOR_QEMU_emulator-arm = "qemu-system-arm"
@@ -53,6 +58,12 @@ EMULATOR_QEMU_OPTIONS_append_emulator-arm = " \
     -net nic,model=smc91c111 \
     -net user,hostfwd=tcp::${SSHPORT}-:22 \
 "
+EMULATOR_KERNEL_CMDLINE_append_emulator-arm = " \
+    root=/dev/sda rw \
+    console=ttyAMA0 \
+"
+
+
 
 # check if MACHINE is an emulator (quit otherwise)
 addtask not_emulable before do_fetch
@@ -166,8 +177,7 @@ while [ $# -gt 0 ]; do
                                 -vigs-backend gl \
                                 -yagl-backend vigs \
                                 -vga none"
-	    CMDLINE="video=LVDS-1:${RESOLUTION}-32@60 \
-                     modprobe.blacklist=uvesafb"
+	    CMDLINE="${CMDLINE} modprobe.blacklist=uvesafb"
 	    shift;;
         -ssh-port ) SSHPORT="$2"; shift 2;;
         -resolution ) RESOLUTION="$2"; shift 2;;
