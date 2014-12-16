@@ -15,7 +15,7 @@ if test -z "${XDG_RUNTIME_DIR}"; then
     fi
 fi
 
-if [ -e /sys/class/drm/card0 ]; then
+if [ `grep -c "yagl" /proc/cmdline` -eq 0 ]; then
     # set default platform for Qt application to wayland-egl
     export QT_QPA_PLATFORM=wayland-egl
     # set default engine for elf application to wayland-egl
@@ -28,7 +28,7 @@ fi
 
 # launch weston on login (tty1 only)
 if [[ $(tty) = /dev/tty1 ]]; then
-    if [ -e /sys/class/drm/card0 ]; then 
+    if [ `grep -c "yagl" /proc/cmdline` -eq 0 ]; then 
         /usr/bin/weston --log=/var/log/weston.log
     else
         /usr/bin/weston -Bfbdev-backend.so --log=/var/log/weston.log

@@ -27,23 +27,23 @@ EMULATOR_KERNEL ?= "${KERNEL_IMAGETYPE}"
 EMULATOR_KERNEL_CMDLINE ?= " \
     ip=dhcp \
     console=tty1 \
-    uvesafb.mode_option=${RESOLUTION}-32 \
     video=LVDS-1:${RESOLUTION}-32@60 \
 "
 
-EMULATOR_QEMU_OPTIONS ?= " \
+EMULATOR_QEMU_OPTIONS ?= " \ 
     -kernel ${KERNEL} \
     -hda ${ROOTFS} \
     -m ${MEMORY} \
     -display sdl \
     -soundhw all \
     -serial stdio \
+    -enable-vigs -vigs-backend gl \
+    -vga none \
     -append '${EMULATOR_KERNEL_CMDLINE} ${CMDLINE}' \
 "
 
 EMULATOR_QEMU_emulator-x86 = "qemu-system-i386"
 EMULATOR_QEMU_OPTIONS_append_emulator-x86 = " \
-    -vga vmware \
     -device e1000,netdev=freenivi \
     -netdev user,id=freenivi,hostfwd=tcp::${SSHPORT}-:22 \
 "
@@ -62,8 +62,6 @@ EMULATOR_KERNEL_CMDLINE_append_emulator-arm = " \
     root=/dev/sda rw \
     console=ttyAMA0 \
 "
-
-
 
 # check if MACHINE is an emulator (quit otherwise)
 addtask not_emulable before do_fetch
@@ -169,22 +167,22 @@ EOT
 MEMORY=256
 SSHPORT=10022
 RESOLUTION="800x600"
+graphics_acceleration=0
 while [ $# -gt 0 ]; do
     case "$1" in
-        -graphics-acceleration )
-	    OPTIONS="${OPTIONS} -enable-yagl \
-                                -enable-vigs \
-                                -vigs-backend gl \
-                                -yagl-backend vigs \
-                                -vga none"
-	    CMDLINE="${CMDLINE} modprobe.blacklist=uvesafb"
-	    shift;;
+        -graphics-acceleration ) graphics_acceleration=1; shift;;
         -ssh-port ) SSHPORT="$2"; shift 2;;
         -resolution ) RESOLUTION="$2"; shift 2;;
         -h | --help ) usage; exit;;
         * ) OPTIONS="${OPTIONS} $1"; shift;
     esac
 done
+
+if [ $graphics_acceleration -eq 1 ]; then
+    OPTIONS="${OPTIONS} -enable-yagl -yagl-backend vigs"
+else
+    CMDLINE="modprobe.blacklist=yagl"
+fi
 OPTIONS="${EMULATOR_QEMU_OPTIONS} ${OPTIONS}"
 
 # execute
