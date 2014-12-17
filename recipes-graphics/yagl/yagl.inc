@@ -9,6 +9,7 @@ SRC_URI += " \
     file://0001-fix-libdir.patch \
     file://install-headers.patch \
     file://mesa-egl-no-headers.patch \
+    file://0006-add-wl-egl-platfrom-in-eglplatform-header.patch \
     file://95-yagl.rules \
 "
 
@@ -16,8 +17,7 @@ BBCLASSEXTEND = "native"
 
 DEPENDS = "udev libdrm flex bison"
 
-PROVIDES = "virtual/libgl virtual/libgles1 virtual/libgles2 virtual/egl virtual/mesa"
-#PROVIDES = "emulator-yagl emulator-yagl-dev"
+PROVIDES = "virtual/gl virtual/libgles1 virtual/libgles2 virtual/egl virtual/mesa"
 
 inherit autotools-brokensep cmake pkgconfig
 

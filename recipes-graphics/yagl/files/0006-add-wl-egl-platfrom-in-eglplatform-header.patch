@@ -1,0 +1,17 @@
+diff --git a/include/EGL/eglplatform.h b/include/EGL/eglplatform.h
+index 6bf00aa..c65f659 100644
+--- a/include/EGL/eglplatform.h
++++ b/include/EGL/eglplatform.h
+@@ -93,6 +93,12 @@ typedef struct ANativeWindow*           EGLNativeWindowType;
+ typedef struct egl_native_pixmap_t*     EGLNativePixmapType;
+ typedef void*                           EGLNativeDisplayType;
+ 
++#elif defined(WL_EGL_PLATFORM)
++
++typedef struct wl_display     *EGLNativeDisplayType;
++typedef struct wl_egl_pixmap  *EGLNativePixmapType;
++typedef struct wl_egl_window  *EGLNativeWindowType;
++
+ #elif defined(__unix__)
+ 
+ #ifdef MESA_EGL_NO_X11_HEADERS
