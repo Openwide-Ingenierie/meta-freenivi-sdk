@@ -1,6 +1,6 @@
 FILESEXTRAPATHS_prepend := "${THISDIR}/${PN}-${PV}:"
 
-SRC_URI += " file://vigs.patch"
+SRC_URI += "file://vigs.patch "
 
 PACKAGES =+ "${PN}-vigs"
 
