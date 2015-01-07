@@ -1,0 +1,71 @@
+meta-freenivi-sdk, the Freenivi SDK layer
+=========================================
+
+meta-freenivi-sdk is a layer containing the rules to create the SDK packages for
+Qt Creator and define the two emulator machines: emulator-x86 and emulator-arm.
+The outputs are Qt Installer Framework packages.
+The goal of the layer is to provide an easy way to produce SDK packages for any
+distribution and machines.
+
+If you are not using the meta-freenivi layer into your bitbake build, you must
+add to your local.conf the following line:
+  BBMASK += "|recipes-sdk/freenivi"
+
+
+Layer Dependencies
+------------------
+
+URI: https://github.com/openembedded/oe-core
+> branch:   dizzy
+> revision: HEAD
+
+URI: https://github.com/meta-qt5/meta-qt5
+> branch:   dizzy
+> revision: HEAD
+
+(Optional) URI: https://github.con/openwide-ingenerie/meta-freenivi
+> branch:   dissy
+> revision: HEAD
+
+
+Provided Machines
+-----------------
+
+The list of provided machines is:
+* emulator-x86
+* emulator-arm
+
+
+Build a Freenivi SDK packages
+-----------------------------
+
+You can build Freenivi SDK packages using the following steps:
+
+1. Run the following command:
+    $ source <path to meta-oe>/oe-init-build-env
+
+2. Build packages
+    $ bitbake freenivi-sdk
+    $ bitbake freenivi-emulator
+    $ bitbake freenivi-packaged-image
+
+You can find the produced packages in the directory:
+    tmp/deploy/installer-packages/
+
+
+Use Freenivi SDK with another distribution
+------------------------------------------
+
+You just need to include the class you need, depending on what you want to
+build, into your "image" recipe:
+* Add "include freenivi-sdk" to create the SDK of your image
+* Add "include freenivi-emulator" to create the emulator package of your image.
+* Add "include packaged-image" to create an installer-packaged containing your
+  image
+
+You can see the recipes in recipes-sdk/freenivi as examples.
+
+Note: emulator packages are only buildable with emulator-x86 or emulator-arm as
+MACHINE, and their credentials are:
+  user: root
+  password: freenivi
