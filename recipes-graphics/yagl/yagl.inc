@@ -17,7 +17,7 @@ BBCLASSEXTEND = "native"
 
 DEPENDS = "udev libdrm flex bison"
 
-PROVIDES = "virtual/gl virtual/libgles1 virtual/libgles2 virtual/egl virtual/mesa"
+PROVIDES = "virtual/gl virtual/libgles1 virtual/libgles2 virtual/egl virtual/wayland-egl virtual/mesa"
 
 inherit autotools-brokensep cmake pkgconfig
 
