@@ -3,6 +3,9 @@ inherit populate_sdk populate_sdk_qt5
 FREENIVI_SDK_TARGET ?= "${DISTRO}/${REAL_MULTIMACH_TARGET_SYS}"
 FREENIVI_INSTALLER_PACKAGE_DEPLOY_DIR ?= "${DEPLOY_DIR}/installer-packages/"
 
+FREENIVI_DEVICE_TYPE = "GenericLinuxOsType"
+FREENIVI_DEVICE_TYPE_emulator = "FreeniviEmulatorOsType"
+
 # Create an installer-package for Qt installer-framework.
 # Note: the space before the '}' in the heredoc are here to avoid error with
 #       the bitbake parser.
@@ -413,7 +416,7 @@ $SDKTOOL addKit \
     --id "$KIT_ID" \
     --name "$KIT_NAME" \
     --debuggerid "$DEBUGGER_ID" \
-    --devicetype "GenericLinuxOsType" \
+    --devicetype "${FREENIVI_DEVICE_TYPE}" \
     --sysroot "$SDKTARGETSYSROOT" \
     --toolchain "$TOOLCHAIN_PREFIX:$TOOLCHAIN_ID" \
     --qt "$QTVERSION_ID" \
