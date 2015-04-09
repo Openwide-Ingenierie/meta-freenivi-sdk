@@ -158,6 +158,7 @@ Emulator options:
                 enable 3D graphics acceleration (VIGS + YaGL)
  -ssh-port      set the ssh connection port (must be a free port of the host)
  -resolution    set the emulator display resolution (<width>x<heigth>)
+ -rootfs        set the rootfs to use (path to image)
 
 EOT
     ${QEMU} --help | tail -n +6
@@ -173,6 +174,7 @@ while [ $# -gt 0 ]; do
         -graphics-acceleration ) graphics_acceleration=1; shift;;
         -ssh-port ) SSHPORT="$2"; shift 2;;
         -resolution ) RESOLUTION="$2"; shift 2;;
+        -rootfs ) ROOTFS="$2"; shift 2;;
         -h | --help ) usage; exit;;
         * ) OPTIONS="${OPTIONS} $1"; shift;
     esac
