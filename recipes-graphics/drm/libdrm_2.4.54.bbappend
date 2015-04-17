@@ -1,9 +1,9 @@
 FILESEXTRAPATHS_prepend := "${THISDIR}/${PN}-${PV}:"
 
-SRC_URI += "file://vigs.patch "
+SRC_URI_append_emulator = " file://vigs.patch"
 
-PACKAGES =+ "${PN}-vigs"
+PACKAGES_append_emulator = " ${PN}-vigs"
 
-RRECOMMENDS_${PN}-drivers = "${PN}-vigs"
+RRECOMMENDS_${PN}-drivers_append_emulator = " ${PN}-vigs"
 
-FILES_${PN}-vigs = "${libdir}/libdrm_vigs.so.*"
+FILES_${PN}-vigs_append_emulator = " ${libdir}/libdrm_vigs.so.*"
