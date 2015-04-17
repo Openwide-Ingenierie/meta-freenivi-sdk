@@ -47,3 +47,5 @@ FILES_${PN}-dev = "${includedir}/* ${libdir}/pkgconfig/* ${libdir}/*.so"
 RPROVIDES_${PN} += "libgles2 libegl"
 
 RDEPENDS_${PN}-dev += "${PN}"
+
+COMPATIBLE_MACHINE = "(emulator-arm|emulator-x86)"
