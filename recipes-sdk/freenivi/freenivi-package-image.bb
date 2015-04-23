@@ -1,5 +1,4 @@
-DESCRIPTION = "Freenivi Package Image."
+DESCRIPTION = "Freenivi package image."
 LICENSE = "MIT"
 
-inherit freenivi-image
-inherit freenivi-package-image
+inherit freenivi-image freenivi-package-image

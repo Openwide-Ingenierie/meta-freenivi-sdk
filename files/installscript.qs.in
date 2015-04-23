@@ -1,0 +1,32 @@
+function Component()
+{
+    gui.pageWidgetByObjectName("ReadyForInstallationPage").left.connect(Component.prototype.readyToInstall);
+}
+
+Component.prototype.readyToInstall = function()
+{
+    // Add QtCreator as dependency, because you need QtCreator to be installed
+    // first.
+    if (installer.componentByName("qt_creator") != null &&
+        (installer.componentByName("qt_creator").installationRequested() ||
+         installer.componentByName("qt_creator").isInstalled()))
+    {
+        component.addDependency("qt_creator");
+        installer.componentsToInstallNeedsRecalculation();
+    }
+}
+
+Component.prototype.createOperations = function()
+{
+    component.createOperations();
+
+    component.addOperation("Execute", "@TargetDir@/@FREENIVI_PACKAGE_SDK_DIRECTORY@/setup-sdk.sh");
+
+    if (installer.componentByName("qt_creator") != null &&
+        (installer.componentByName("qt_creator").installationRequested() ||
+         installer.componentByName("qt_creator").isInstalled()))
+        component.addOperation(
+            "Execute", "@TargetDir@/@FREENIVI_PACKAGE_SDK_DIRECTORY@/add-kit.sh", "@TargetDir@/QtCreator/bin/sdktool",
+            "UNDOEXECUTE", "@TargetDir@/@FREENIVI_PACKAGE_SDK_DIRECTORY@/del-kit.sh", "@TargetDir@/QtCreator/bin/sdktool"
+        );
+}

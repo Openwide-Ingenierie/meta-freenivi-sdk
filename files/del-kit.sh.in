@@ -1,0 +1,36 @@
+#! /bin/bash
+
+if [ $# -gt 0 ]; then
+    if [ "$1" == "-h" -o "$1" == "--help" ]; then
+        echo "Usage: $0 [<sdktool path>]"
+	echo "  Remove the SDK kit from Qt Creator."
+        exit 0
+    fi
+    SDKTOOL=$(which "$1")
+else
+    SDKTOOL=$(which sdktool)
+fi
+
+if [ -z "$SDKTOOL" ]; then
+    echo "error: cannot found sdktool"
+    exit 2
+fi
+
+echo "Removing @DISTRO_NAME@ kit for @REAL_MULTIMACH_TARGET_SYS@..."
+
+BASE_ID=@DISTRO@_
+TOOLCHAIN_ID=${BASE_ID}G++-@REAL_MULTIMACH_TARGET_SYS@
+TOOLCHAIN_PREFIX=ProjectExplorer.ToolChain.Gcc
+DEBUGGER_ID=${BASE_ID}GDB-@REAL_MULTIMACH_TARGET_SYS@
+QTVERSION_ID=${BASE_ID}QT5-@REAL_MULTIMACH_TARGET_SYS@
+KIT_ID=${BASE_ID}KIT-@REAL_MULTIMACH_TARGET_SYS@
+
+$SDKTOOL rmKit --id "$KIT_ID"
+$SDKTOOL rmTC --id "$TOOLCHAIN_PREFIX:$TOOLCHAIN_ID"
+$SDKTOOL rmDebugger --id "$DEBUGGER_ID"
+$SDKTOOL rmQt --id "$QTVERSION_ID"
+
+echo "@DISTRO_NAME@ kit for @REAL_MULTIMACH_TARGET_SYS@ has been successfully\
+ removed."
+
+exit 0

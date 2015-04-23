@@ -1,0 +1,220 @@
+#! /bin/bash
+
+if [ $# -gt 0 ]; then
+    if [ "$1" == "-h" -o "$1" == "--help" ]; then
+        echo "Usage: $0 [<sdktool path>]"
+	echo "  Add the SDK kit to Qt Creator."
+        exit 0
+    fi
+    SDKTOOL=$(which "$1")
+else
+    SDKTOOL=$(which sdktool)
+fi
+
+if [ -z "$SDKTOOL" ]; then
+    echo "error: cannot find sdktool"
+    exit 2
+fi
+
+SDK_TARGET_DIRECTORY="$(cd $(dirname $(readlink -f $0)) && pwd)"
+
+# export PATH for the command `command'
+source ${SDK_TARGET_DIRECTORY}/environment-setup-@REAL_MULTIMACH_TARGET_SYS@
+
+BASE_ID="@DISTRO@_"
+BASE_NAME="@DISTRO_NAME@"
+
+QTVERSION=qmake
+QTVERSION_ID=${BASE_ID}QT5-@REAL_MULTIMACH_TARGET_SYS@
+QTVERSION_NAME="Qt5 for ${BASE_NAME} (@REAL_MULTIMACH_TARGET_SYS@)"
+QTVERSION_PATH=$(command -v $QTVERSION)
+
+DEBUGGER=@TARGET_PREFIX@gdb
+DEBUGGER_ID=${BASE_ID}GDB-@REAL_MULTIMACH_TARGET_SYS@
+DEBUGGER_NAME="GDB for ${BASE_NAME} (@REAL_MULTIMACH_TARGET_SYS@)"
+DEBUGGER_PATH=$(command -v $DEBUGGER)
+
+TOOLCHAIN=@TARGET_PREFIX@g++
+TOOLCHAIN_ID=${BASE_ID}G++-@REAL_MULTIMACH_TARGET_SYS@
+# Toolchain IDs need a prefix
+TOOLCHAIN_PREFIX=ProjectExplorer.ToolChain.Gcc
+TOOLCHAIN_NAME="G++ for ${BASE_NAME} (@REAL_MULTIMACH_TARGET_SYS@)"
+TOOLCHAIN_PATH=$(command -v $TOOLCHAIN)
+
+KIT_ID=${BASE_ID}KIT-@REAL_MULTIMACH_TARGET_SYS@
+KIT_NAME="${BASE_NAME} (@REAL_MULTIMACH_TARGET_SYS@)"
+
+MKSPEC="linux-@DISTRO@-g++"
+
+echo "Adding @DISTRO_NAME@ kit for @REAL_MULTIMACH_TARGET_SYS@..."
+
+####################################[ ABI ]#####################################
+
+# We need to detect ABI of the toolchain for add the toolchain and the debugger.
+# We use the same algorithm found in qtcreator sources in the file:
+#   src/plugins/projectexplorer/abi.cpp
+
+arch=unknown
+os=unknown
+flavor=unknown
+format=unknown
+width=unknown
+
+for p in $($TOOLCHAIN_PATH -dumpmachine | sed 's/-/ /g'); do
+    case $p in
+        unknown | pc | gnu | none | w64 | uclibc | 86_64 | redhat | gnueabi )
+            continue
+            ;;
+        i386 | i486 | i586 | i686 | x86 )
+            arch=x86
+            width=32bit
+            ;;
+        arm* )
+            arch=arm
+            width=32bit
+            ;;
+        mipsel )
+            arch=mips
+            width=32bit
+            ;;
+        x86_64 | amd64 )
+            arch=x86
+            width=64bit
+            ;;
+        powerpc64 )
+            arch=ppc
+            width=64bit
+            ;;
+        powerpc )
+            arch=ppc
+            width=32bit
+            ;;
+        linux | linux6e )
+            os=linux
+            [[ $flavor = unknown ]] && flavor=generic
+            format=elf
+            ;;
+        android | androideabi )
+            flavor=android
+            ;;
+        freebsd* )
+            os=bsd
+            [[ $flavor = unknown ]] && flavor=freebsd
+            format=elf
+            ;;
+        mingw32 | win32 | mingw32msvc )
+            arch=x86
+            os=windows
+            flavor=msys
+            format=pe
+            ;;
+        apple )
+            os=macos
+            flavor=generic
+            format=mach_o
+            ;;
+        darwin10 )
+            width=64bit
+            ;;
+        darwin9 )
+            width=32bit
+            ;;
+        gnueabi )
+            format=elf
+            ;;
+    esac
+done
+
+ABI=${arch}-${os}-${flavor}-${format}-${width}
+
+#################################[ QTVERSION ]##################################
+
+exists=$($SDKTOOL find qtversions QString:"$QTVERSION_NAME")
+if [[ -n $exists ]]; then
+    $SDKTOOL rmQt --id "$QTVERSION_ID"
+fi
+
+$SDKTOOL addQt \
+    --id "$QTVERSION_ID" \
+    --name "$QTVERSION_NAME" \
+    --qmake "$QTVERSION_PATH"  \
+    --type "RemoteLinux.EmbeddedLinuxQt"
+
+error_code=$?
+if [ $error_code -ne 0 ]; then
+    echo "error: failed to add QtVersion"
+    exit $error_code
+fi
+
+###############################[ DEBUGGER ]#####################################
+
+exists=$($SDKTOOL find debuggers QString:"$DEBUGGER_ID")
+if [[ -n $exists ]];then
+    $SDKTOOL rmDebugger --id $DEBUGGER_ID
+fi
+
+$SDKTOOL addDebugger \
+    --id "$DEBUGGER_ID" \
+    --name "$DEBUGGER_NAME" \
+    --binary "$DEBUGGER_PATH" \
+    --abis "$ABI"
+
+error_code=$?
+if [ $error_code -ne 0 ]; then
+    $SDKTOOL rmQt --id "$QTVERSION_ID"
+    echo "error: failed to add debbuger"
+    exit $error_code
+fi
+
+#################################[ TOOLCHAIN ]##################################
+
+exists=$($SDKTOOL find toolchains QByteArray:"$TOOLCHAIN_PREFIX:$TOOLCHAIN_ID")
+if [[ -n $exists ]]; then
+    $SDKTOOL rmTC --id "$TOOLCHAIN_PREFIX:$TOOLCHAIN_ID"
+fi
+
+$SDKTOOL addTC \
+    --id "$TOOLCHAIN_PREFIX:$TOOLCHAIN_ID" \
+    --name "$TOOLCHAIN_NAME" \
+    --path "$TOOLCHAIN_PATH" \
+    --abi "$ABI"
+
+error_code=$?
+if [ $error_code -ne 0 ]; then
+    $SDKTOOL rmQt --id "$QTVERSION_ID"
+    $SDKTOOL rmDebugger --id "$DEBUGGER_ID"
+    echo "error: failed to add toolchain"
+    exit $error_code
+fi
+
+##################################[ KIT ]#######################################
+
+exists=$($SDKTOOL find profiles QString:"$KIT_ID")
+if [[ -n $exists ]]; then
+    $SDKTOOL rmKit --id "$KIT_ID"
+fi
+
+$SDKTOOL addKit \
+    --id "$KIT_ID" \
+    --name "$KIT_NAME" \
+    --debuggerid "$DEBUGGER_ID" \
+    --devicetype "GenericLinuxOsType" \
+    --sysroot "$SDKTARGETSYSROOT" \
+    --toolchain "$TOOLCHAIN_PREFIX:$TOOLCHAIN_ID" \
+    --qt "$QTVERSION_ID" \
+    --mkspec "$MKSPEC" \
+    &>/dev/null
+
+error_code=$?
+if [ $error_code -ne 0 ]; then
+    $SDKTOOL rmQt --id "$QTVERSION_ID"
+    $SDKTOOL rmDebugger --id "$DEBUGGER_ID"
+    $SDKTOOL rmTC --id "$TOOLCHAIN_PREFIX:$TOOLCHAIN_ID"
+    echo "error: failed to add kit"
+    exit $error_code
+fi
+
+echo "@DISTRO_NAME@ kit for @REAL_MULTIMACH_TARGET_SYS@ has been successfully\
+ added."
+
+exit 0

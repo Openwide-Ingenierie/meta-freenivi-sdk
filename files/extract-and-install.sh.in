@@ -1,0 +1,77 @@
+#! /bin/bash
+
+INST_ARCH=$(uname -m | sed -e "s/i[3-6]86/ix86/" -e "s/x86[-_]64/x86_64/")
+SDK_ARCH=$(echo @SDK_ARCH@ | sed -e "s/i[3-6]86/ix86/" -e "s/x86[-_]64/x86_64/")
+
+if [ "$INST_ARCH" != "$SDK_ARCH" ]; then
+	# Allow for installation of ix86 SDK on x86_64 host
+	if [ "$INST_ARCH" != x86_64 -o "$SDK_ARCH" != ix86 ]; then
+		echo "error: installation machine not supported"
+		exit 1
+	fi
+fi
+
+SDK_DEFAULT_TARGET_DIRECTORY="@SDKPATH@"
+SUDO=""
+SDK_TARGET_DIRECTORY=""
+extract_only=0
+
+while getopts "d:e" OPT; do
+	case $OPT in
+	        d) SDK_TARGET_DIRECTORY=$OPTARG;;
+		e) extract_only=1;;
+	        *) echo "Usage: $(basename $0) [ -e ] [-d <install directory>]"
+		   echo "  Extract and install the SDK"
+		   echo "     -e           Extract only"
+		   echo "     -d PATH      Install to PATH instead of asking"
+		   exit 1
+		   ;;
+	esac
+done
+
+if [ "$SDK_TARGET_DIRECTORY" = "" ]; then
+	read -e -p "Enter target directory for SDK (default: $SDK_DEFAULT_TARGET_DIRECTORY): " SDK_TARGET_DIRECTORY
+	[ "$SDK_TARGET_DIRECTORY" = "" ] && SDK_TARGET_DIRECTORY=$SDK_DEFAULT_TARGET_DIRECTORY
+fi
+
+eval SDK_TARGET_DIRECTORY=$(echo "$SDK_TARGET_DIRECTORY" | sed 's/ /\\ /g')
+if [ -d "$SDK_TARGET_DIRECTORY" ]; then
+	SDK_TARGET_DIRECTORY=$(cd "$SDK_TARGET_DIRECTORY"; pwd)
+else
+	SDK_TARGET_DIRECTORY=$(readlink -m "$SDK_TARGET_DIRECTORY")
+fi
+
+if [ -n "$(echo $SDK_TARGET_DIRECTORY | grep ' ')" ]; then
+	echo "error: the target directory path ($SDK_TARGET_DIRECTORY) contains spaces"
+	exit 1
+fi
+
+# try to create the directory (this will not succeed if user doesn't have rights)
+mkdir -p $SDK_TARGET_DIRECTORY >/dev/null 2>&1
+
+# if don't have the right to access dir, gain by sudo
+if [ ! -x $SDK_TARGET_DIRECTORY -o ! -w $SDK_TARGET_DIRECTORY -o ! -r $SDK_TARGET_DIRECTORY ]; then
+	SUDO=$(which "sudo")
+	if [ -z $SUDO ]; then
+		echo "error: no command 'sudo' found, please install sudo first"
+		exit 1
+	fi
+
+	# test sudo could gain root right
+	$SUDO pwd >/dev/null 2>&1
+	[ $? -ne 0 ] && echo "error: you are not allowed to execute as root" && exit 1
+
+	# now that we have sudo rights, create the directory
+	$SUDO mkdir -p $SDK_TARGET_DIRECTORY >/dev/null 2>&1
+fi
+
+payload_offset=$(($(grep -na -m1 "^MARKER:$" $0|cut -d':' -f1) + 1))
+echo "Extracting SDK..."
+tail -n +$payload_offset $0 | $SUDO tar xj -C $SDK_TARGET_DIRECTORY
+
+printf "Setting it up..."
+[ $extract_only = 0 ] && (cd $SDK_TARGET_DIRECTORY && $SUDO ./setup-sdk.sh)
+echo ""
+exit 0
+
+MARKER:
