@@ -1,0 +1,1 @@
+PACKAGECONFIG_GL_emulator = "gles2"
