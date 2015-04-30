@@ -25,7 +25,7 @@ FREENIVI_EMULATOR_QEMU_OPTIONS ?= " \
 FREENIVI_EMULATOR_QEMU_emulator-x86 = "qemu-system-i386"
 FREENIVI_EMULATOR_QEMU_OPTIONS_append_emulator-x86 = " \
     -device e1000,netdev=freenivi \
-    -netdev user,id=freenivi,hostfwd=tcp::${SSHPORT}-:22 \
+    -netdev user,id=freenivi,hostfwd=tcp::${SSHPORT}-:22,hostfwd=tcp::10023-:10023,hostfwd=tcp::10024-:10024,hostfwd=tcp::10025-:10025 \
 "
 FREENIVI_EMULATOR_KERNEL_CMDLINE_append_emulator-x86 = " \
     root=/dev/hda rw \
@@ -36,7 +36,7 @@ FREENIVI_EMULATOR_QEMU_emulator-arm = "qemu-system-arm"
 FREENIVI_EMULATOR_QEMU_OPTIONS_append_emulator-arm = " \
     -machine versatilepb \
     -net nic,model=smc91c111 \
-    -net user,hostfwd=tcp::${SSHPORT}-:22 \
+    -net user,hostfwd=tcp::${SSHPORT}-:22,hostfwd=tcp::10023-:10023,hostfwd=tcp::10024-:10024,hostfwd=tcp::10025-:10025 \
 "
 FREENIVI_EMULATOR_KERNEL_CMDLINE_append_emulator-arm = " \
     root=/dev/sda rw \
