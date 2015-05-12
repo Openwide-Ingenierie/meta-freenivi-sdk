@@ -8,3 +8,14 @@ PREFERRED_PROVIDER_virtual/wayland-egl = "yagl"
 PREFERRED_PROVIDER_virtual/kernel = "linux-yocto"
 PREFERRED_VERSION_linux-yocto = "3.14%"
 
+XSERVER = " \
+    xserver-xorg \
+    xf86-input-vmmouse \
+    xf86-input-keyboard \
+    xf86-input-evdev \
+    xf86-video-cirrus \
+    xf86-video-fbdev \
+    xf86-video-vmware \
+"
+
+MACHINEOVERRIDES =. "emulator:"
