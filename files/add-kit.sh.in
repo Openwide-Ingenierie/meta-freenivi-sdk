@@ -198,7 +198,7 @@ $SDKTOOL addKit \
     --id "$KIT_ID" \
     --name "$KIT_NAME" \
     --debuggerid "$DEBUGGER_ID" \
-    --devicetype "GenericLinuxOsType" \
+    --devicetype "@DEVICE_TYPE@" \
     --sysroot "$SDKTARGETSYSROOT" \
     --toolchain "$TOOLCHAIN_PREFIX:$TOOLCHAIN_ID" \
     --qt "$QTVERSION_ID" \
