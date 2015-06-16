@@ -10,6 +10,7 @@ PREFERRED_VERSION_linux-yocto = "3.14%"
 
 XSERVER = " \
     xserver-xorg \
+    ${@bb.utils.contains('DISTRO_FEATURES', 'opengl', 'mesa-driver-swrast', '', d)} \
     xf86-input-vmmouse \
     xf86-input-keyboard \
     xf86-input-evdev \
