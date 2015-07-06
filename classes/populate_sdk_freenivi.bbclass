@@ -11,21 +11,22 @@ create_sdk_files_prepend () {
 	# copy script to add SDK to Qt Creator as a kit
 	cp -f ${FREENIVI_TEMPLATES}/add-kit.sh.in ${SDK_OUTPUT}/${SDKPATH}/add-kit.sh
 	# substitute variables
-        sed -i -e 's#@DISTRO@#${DISTRO}#g' \
-                -e 's#@DISTRO_NAME@#${DISTRO_NAME}#g' \
-	        -e 's#@REAL_MULTIMACH_TARGET_SYS@#${REAL_MULTIMACH_TARGET_SYS}#g' \
-	        -e 's#@TARGET_PREFIX@#${TARGET_PREFIX}#g' \
+	sed -i -e 's#@DISTRO@#${DISTRO}#g' \
+		-e 's#@DISTRO_NAME@#${DISTRO_NAME}#g' \
+		-e 's#@REAL_MULTIMACH_TARGET_SYS@#${REAL_MULTIMACH_TARGET_SYS}#g' \
+		-e 's#@TARGET_PREFIX@#${TARGET_PREFIX}#g' \
 		-e 's#@DEVICE_TYPE@#${FREENIVI_DEVICE_TYPE}#g' \
-	        ${SDK_OUTPUT}/${SDKPATH}/add-kit.sh
+		${SDK_OUTPUT}/${SDKPATH}/add-kit.sh
 	# add execution permission
 	chmod +x ${SDK_OUTPUT}/${SDKPATH}/add-kit.sh
 
         # copy script to remove Qt Creator kit from this SDK
 	cp -f ${FREENIVI_TEMPLATES}/del-kit.sh.in ${SDK_OUTPUT}/${SDKPATH}/del-kit.sh
 	# substitute variables
-    	sed -i -e 's#@DISTRO_NAME@#${DISTRO_NAME}#g' \
-	        -e 's#@REAL_MULTIMACH_TARGET_SYS@#${REAL_MULTIMACH_TARGET_SYS}#g' \
-	        ${SDK_OUTPUT}/${SDKPATH}/del-kit.sh
+	sed -i -e 's#@DISTRO@#${DISTRO}#g' \
+		-e 's#@DISTRO_NAME@#${DISTRO_NAME}#g' \
+		-e 's#@REAL_MULTIMACH_TARGET_SYS@#${REAL_MULTIMACH_TARGET_SYS}#g' \
+		${SDK_OUTPUT}/${SDKPATH}/del-kit.sh
 	# add execution permission
 	chmod +x ${SDK_OUTPUT}/${SDKPATH}/del-kit.sh
 
@@ -33,7 +34,7 @@ create_sdk_files_prepend () {
 	cp -f ${FREENIVI_TEMPLATES}/setup-sdk.sh.in ${SDK_OUTPUT}/${SDKPATH}/setup-sdk.sh
 	# substitute variables
 	sed -i -e 's#@DISTRO@#${DISTRO}#g' \
-	        -e 's#@REAL_MULTIMACH_TARGET_SYS@#${REAL_MULTIMACH_TARGET_SYS}#g' \
+		-e 's#@REAL_MULTIMACH_TARGET_SYS@#${REAL_MULTIMACH_TARGET_SYS}#g' \
 		${SDK_OUTPUT}/${SDKPATH}/setup-sdk.sh
 	# add execution permission
 	chmod +x ${SDK_OUTPUT}/${SDKPATH}/setup-sdk.sh
