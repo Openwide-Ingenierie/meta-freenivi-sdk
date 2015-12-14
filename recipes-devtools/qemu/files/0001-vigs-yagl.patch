@@ -1,8 +1,8 @@
 diff --git a/hw/Makefile.objs b/hw/Makefile.objs
-index 52a1464..f644e62 100644
+index 73afa41..8a9785f 100644
 --- a/hw/Makefile.objs
 +++ b/hw/Makefile.objs
-@@ -30,6 +30,8 @@ devices-dirs-$(CONFIG_VIRTIO) += virtio/
+@@ -31,6 +31,8 @@ devices-dirs-$(CONFIG_VIRTIO) += virtio/
  devices-dirs-$(CONFIG_SOFTMMU) += watchdog/
  devices-dirs-$(CONFIG_SOFTMMU) += xen/
  devices-dirs-$(CONFIG_MEM_HOTPLUG) += mem/
@@ -82612,10 +82612,10 @@ index 0000000..9007684
 +
 +#endif
 diff --git a/qemu-options.hx b/qemu-options.hx
-index 1549625..0d1270e 100644
+index 77f5853..a29b337 100644
 --- a/qemu-options.hx
 +++ b/qemu-options.hx
-@@ -164,8 +164,8 @@ Set default value of @var{driver}'s property @var{prop} to @var{value}, e.g.:
+@@ -185,8 +185,8 @@ Set default value of @var{driver}'s property @var{prop} to @var{value}, e.g.:
  qemu-system-i386 -global ide-drive.physical_block_size=4096 -drive file=file,if=ide,index=0,media=disk
  @end example
  
@@ -82624,9 +82624,9 @@ index 1549625..0d1270e 100644
 +In particular, you can use this to set driver properties for devices which are
 +created automatically by the machine model. To create a device which is not
  created automatically and set properties on it, use -@option{device}.
- ETEXI
  
-@@ -2893,6 +2893,40 @@ Enable KVM full virtualization support. This option is only available
+ -global @var{driver}.@var{prop}=@var{value} is shorthand for -global
+@@ -3013,6 +3013,40 @@ Enable KVM full virtualization support. This option is only available
  if KVM support is enabled when compiling.
  ETEXI
  
@@ -82668,10 +82668,10 @@ index 1549625..0d1270e 100644
      "-xen-domid id   specify xen guest domain id\n", QEMU_ARCH_ALL)
  DEF("xen-create", 0, QEMU_OPTION_xen_create,
 diff --git a/vl.c b/vl.c
-index 7f8bd39..5ec60f9 100644
+index 0adbbd6..2aa6113 100644
 --- a/vl.c
 +++ b/vl.c
-@@ -124,6 +124,18 @@ int main(int argc, char **argv)
+@@ -126,6 +126,18 @@ int main(int argc, char **argv)
  #define MAX_VIRTIO_CONSOLES 1
  #define MAX_SCLP_CONSOLES 1
  
@@ -82690,9 +82690,9 @@ index 7f8bd39..5ec60f9 100644
  static const char *data_dir[16];
  static int data_dir_idx;
  const char *bios_name = NULL;
-@@ -3674,6 +3686,18 @@ int main(int argc, char **argv, char **envp)
+@@ -3657,6 +3669,18 @@ int main(int argc, char **argv, char **envp)
                  olist = qemu_find_opts("machine");
-                 qemu_opts_parse(olist, "accel=kvm", 0);
+                 qemu_opts_parse_noisily(olist, "accel=kvm", false);
                  break;
 +            case QEMU_OPTION_enable_yagl:
 +                enable_yagl = 1;
@@ -82706,12 +82706,12 @@ index 7f8bd39..5ec60f9 100644
 +            case QEMU_OPTION_vigs_backend:
 +                vigs_backend = g_strdup(optarg);
 +                break;
+             case QEMU_OPTION_M:
              case QEMU_OPTION_machine:
                  olist = qemu_find_opts("machine");
-                 opts = qemu_opts_parse(olist, optarg, 1);
-@@ -4425,6 +4449,29 @@ int main(int argc, char **argv, char **envp)
-     if (qemu_opts_foreach(qemu_find_opts("device"), device_init_func, NULL, 1) != 0)
-         exit(1);
+@@ -4537,6 +4561,29 @@ int main(int argc, char **argv, char **envp)
+     /* Did we create any drives that we failed to create a device for? */
+     drive_check_orphaned();
  
 +    // To support legacy VIGS options
 +    if (enable_vigs) {
@@ -82738,4 +82738,4 @@ index 7f8bd39..5ec60f9 100644
 +
      net_check_clients();
  
-     ds = init_displaystate();
+     if (boot_once) {
