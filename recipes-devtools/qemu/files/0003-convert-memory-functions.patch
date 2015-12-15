@@ -1,0 +1,86 @@
+diff --git a/hw/vigs/vigs_device.c b/hw/vigs/vigs_device.c
+index c3185da..8e1b77e 100644
+--- a/hw/vigs/vigs_device.c
++++ b/hw/vigs/vigs_device.c
+@@ -1,9 +1,4 @@
+-/*
+- * vigs
+- *
+- * Copyright (c) 2000 - 2013 Samsung Electronics Co., Ltd. All rights reserved.
+- *
+- * Contact:
++/* * vigs * * Copyright (c) 2000 - 2013 Samsung Electronics Co., Ltd. All rights reserved.  * * Contact:
+  * Stanislav Vorobiov <s.vorobiov@samsung.com>
+  * Jinhyung Jo <jinhyung.jo@samsung.com>
+  * YeongKyoon Lee <yeongkyoon.lee@samsung.com>
+@@ -39,6 +34,8 @@
+ #include "hw/pci/pci.h"
+ #include "ui/console.h"
+ #include "qemu/main-loop.h"
++#include "qemu/error-report.h"
++#include "hw/boards.h"
+ 
+ #define PCI_VENDOR_ID_VIGS 0x19B2
+ #define PCI_DEVICE_ID_VIGS 0x1011
+@@ -363,7 +360,7 @@ static int vigs_device_init(PCIDevice *dev)
+         object_unref(&wsiobj->base);
+ 
+         if (err) {
+-            qerror_report_err(err);
++            error_report_err(err);
+             error_free(err);
+             return -1;
+         }
+@@ -383,11 +380,11 @@ static int vigs_device_init(PCIDevice *dev)
+ 
+     pci_config_set_interrupt_pin(dev->config, 1);
+ 
+-    memory_region_init_ram(&s->vram_bar, OBJECT(s),
++    memory_region_allocate_system_memory(&s->vram_bar, OBJECT(s),
+                            TYPE_VIGS_DEVICE ".vram",
+                            s->vram_size);
+ 
+-    memory_region_init_ram(&s->ram_bar, OBJECT(s),
++     memory_region_allocate_system_memory(&s->ram_bar, OBJECT(s),
+                            TYPE_VIGS_DEVICE ".ram",
+                            s->ram_size);
+ 
+@@ -459,9 +456,9 @@ fail:
+         vigs_fenceman_destroy(s->fenceman);
+     }
+ 
+-    memory_region_destroy(&s->io_bar);
+-    memory_region_destroy(&s->ram_bar);
+-    memory_region_destroy(&s->vram_bar);
++    object_unparent(OBJECT(&s->io_bar));
++    object_unparent(OBJECT(&s->ram_bar));
++    object_unparent(OBJECT(&s->vram_bar));
+ 
+     vigs_log_cleanup();
+ 
+@@ -494,9 +491,9 @@ static void vigs_device_exit(PCIDevice *dev)
+ 
+     vigs_fenceman_destroy(s->fenceman);
+ 
+-    memory_region_destroy(&s->io_bar);
+-    memory_region_destroy(&s->ram_bar);
+-    memory_region_destroy(&s->vram_bar);
++    object_unparent(OBJECT(&s->io_bar));
++    object_unparent(OBJECT(&s->ram_bar));
++    object_unparent(OBJECT(&s->vram_bar));
+ 
+     VIGS_LOG_INFO("VIGS deinitialized");
+ 
+diff --git a/hw/yagl/yagl_device.c b/hw/yagl/yagl_device.c
+index de24498..dcb65b1 100644
+--- a/hw/yagl/yagl_device.c
++++ b/hw/yagl/yagl_device.c
+@@ -386,7 +386,7 @@ static void yagl_device_exit(PCIDevice *dev)
+ 
+     YAGL_LOG_FUNC_ENTER(yagl_device_exit, NULL);
+ 
+-    memory_region_destroy(&s->iomem);
++    object_unparent(OBJECT(&s->iomem));
+ 
+     yagl_server_state_destroy(s->ss);
+ 
