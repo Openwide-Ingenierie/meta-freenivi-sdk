@@ -1,7 +1,5 @@
 FILESEXTRAPATHS_prepend := "${THISDIR}/files:"
 
-SRC_URI_append_emulator = " file://vigs.patch"
-
 PACKAGES_append_emulator = " ${PN}-vigs"
 
 RRECOMMENDS_${PN}-drivers_append_emulator = " ${PN}-vigs"
