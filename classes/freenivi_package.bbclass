@@ -114,7 +114,7 @@ fakeroot python do_freenivi_package_image() {
 fakeroot freenivi_package_image_fill_data() {
         # copy the image into the package
     	mkdir -p ${FREENIVI_PACKAGE_DEPLOY_DIRECTORY}/${FREENIVI_PACKAGE_IMAGE_NAME}/data/${FREENIVI_PACKAGE_IMAGE_DIRECTORY}
-    	cp ${DEPLOY_DIR_IMAGE}/${IMAGE_LINK_NAME}.ext3 ${FREENIVI_PACKAGE_DEPLOY_DIRECTORY}/${FREENIVI_PACKAGE_IMAGE_NAME}/data/${FREENIVI_PACKAGE_IMAGE_DIRECTORY}
+    	cp ${DEPLOY_DIR_IMAGE}/${IMAGE_LINK_NAME}.ext4 ${FREENIVI_PACKAGE_DEPLOY_DIRECTORY}/${FREENIVI_PACKAGE_IMAGE_NAME}/data/${FREENIVI_PACKAGE_IMAGE_DIRECTORY}
     	cp ${DEPLOY_DIR_IMAGE}/${KERNEL_IMAGETYPE} ${FREENIVI_PACKAGE_DEPLOY_DIRECTORY}/${FREENIVI_PACKAGE_IMAGE_NAME}/data/${FREENIVI_PACKAGE_IMAGE_DIRECTORY}
     	if [ -e ${DEPLOY_DIR_IMAGE}/${IMAGE_LINK_NAME}.sdcard ]; then
                 cp ${DEPLOY_DIR_IMAGE}/${IMAGE_LINK_NAME}.sdcard ${FREENIVI_PACKAGE_DEPLOY_DIRECTORY}/${FREENIVI_PACKAGE_IMAGE_NAME}/data/${FREENIVI_PACKAGE_IMAGE_DIRECTORY}
@@ -126,7 +126,7 @@ Freenivi Image Package
 ======================
 
 You can find in this directory the following files:
- - ${IMAGE_LINK_NAME}.ext3: the rootfs
+ - ${IMAGE_LINK_NAME}.ext4: the rootfs
  - ${KERNEL_IMAGETYPE}: the kernel
 EOF
         if [ -e ${DEPLOY_DIR_IMAGE}/${IMAGE_PACKAGE_SDCARD} ]; then
