@@ -6,7 +6,6 @@ PREFERRED_PROVIDER_virtual/mesa = "yagl_%"
 PREFERRED_PROVIDER_virtual/wayland-egl = "yagl_%"
 
 PREFERRED_PROVIDER_virtual/kernel = "linux-yocto"
-PREFERRED_VERSION_linux-yocto ?= "3.14%"
 
 XSERVER = " \
     xserver-xorg \

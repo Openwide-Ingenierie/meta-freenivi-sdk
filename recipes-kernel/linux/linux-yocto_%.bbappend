@@ -12,5 +12,5 @@ COMPATIBLE_MACHINE_emulator-arm = "emulator-arm"
 KMACHINE_emulator-arm = "qemuarm"
 
 COMPATIBLE_MACHINE_emulator-corei7 = "emulator-corei7"
-KMACHINE_emulator-corei7 = "qemux86"
+KMACHINE_emulator-corei7 = "qemux86-64"
 
