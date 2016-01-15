@@ -1,12 +1,36 @@
+From: "jinhyung.jo" <jinhyung.jo@samsung.com>
+Date: Thu, 26 Sep 2013 14:58:40 +0900
+Subject: libdrm_vigs added
+
+Change-Id: Ie67c19bdb4a6f9e2190dbb4d3f825e878fca3635
+Signed-off-by: Stanislav Vorobiov <s.vorobiov@samsung.com>
+Signed-off-by: Jinhyung Jo <jinhyung.jo@samsung.com>
+---
+ Makefile.am             |   6 +-
+ configure.ac            |  98 +++++++++
+ include/drm/Makefile.am |  45 +++++
+ include/drm/vigs_drm.h  | 136 +++++++++++++
+ vigs/Makefile.am        |  24 +++
+ vigs/libdrm_vigs.pc.in  |  11 ++
+ vigs/vigs.c             | 516 ++++++++++++++++++++++++++++++++++++++++++++++++
+ vigs/vigs.h             | 192 ++++++++++++++++++
+ 8 files changed, 1027 insertions(+), 1 deletion(-)
+ create mode 100644 include/drm/Makefile.am
+ create mode 100644 include/drm/vigs_drm.h
+ create mode 100644 vigs/Makefile.am
+ create mode 100644 vigs/libdrm_vigs.pc.in
+ create mode 100644 vigs/vigs.c
+ create mode 100644 vigs/vigs.h
+
 diff --git a/Makefile.am b/Makefile.am
-index 826c30d..0b9d44f 100644
+index 3952a88..efb9aa2 100644
 --- a/Makefile.am
 +++ b/Makefile.am
-@@ -51,7 +51,11 @@ if HAVE_FREEDRENO
+@@ -53,7 +53,11 @@ if HAVE_FREEDRENO
  FREEDRENO_SUBDIR = freedreno
  endif
  
--SUBDIRS = . $(LIBKMS_SUBDIR) $(INTEL_SUBDIR) $(NOUVEAU_SUBDIR) $(RADEON_SUBDIR) $(OMAP_SUBDIR) $(EXYNOS_SUBDIR) $(FREEDRENO_SUBDIR) tests include man
+-SUBDIRS = . $(LIBKMS_SUBDIR) $(INTEL_SUBDIR) $(NOUVEAU_SUBDIR) $(RADEON_SUBDIR) $(OMAP_SUBDIR) $(EXYNOS_SUBDIR) $(FREEDRENO_SUBDIR) tests man
 +if HAVE_VIGS
 +VIGS_SUBDIR = vigs
 +endif
@@ -16,7 +40,7 @@ index 826c30d..0b9d44f 100644
  libdrm_la_LTLIBRARIES = libdrm.la
  libdrm_ladir = $(libdir)
 diff --git a/configure.ac b/configure.ac
-index 1c78c45..50557b9 100644
+index ee59b03..7e9d2fc 100644
 --- a/configure.ac
 +++ b/configure.ac
 @@ -98,6 +98,11 @@ AC_ARG_ENABLE(freedreno-experimental-api,
@@ -24,22 +48,116 @@ index 1c78c45..50557b9 100644
  	      [FREEDRENO=$enableval], [FREEDRENO=no])
  
 +AC_ARG_ENABLE(vigs,
-+	      AS_HELP_STRING([--disable-vigs],
-+	      [Enable support for VIGS's API (default: enabled)]),
-+	      [VIGS=$enableval], [VIGS=yes])
++	     AS_HELP_STRING([--disable-vigs],
++	     [Enable support for VIGS's API (default: enabled)]),
++	     [VIGS=$enableval], [VIGS=yes])
 +
  AC_ARG_ENABLE(install-test-programs,
  		  AS_HELP_STRING([--enable-install-test-programs],
  		  [Install test programs (default: no)]),
-@@ -359,6 +364,7 @@ AM_CONDITIONAL(HAVE_NOUVEAU, [test "x$NOUVEAU" != "xno"])
- if test "x$RADEON" = xyes; then
- 	AC_DEFINE(HAVE_RADEON, 1, [Have radeon support])
+@@ -355,11 +360,101 @@ else
  fi
-+AM_CONDITIONAL(HAVE_VIGS, [test "x$VIGS" != "xno"])
+ AM_CONDITIONAL([HAVE_MANPAGES_STYLESHEET], [test "x$HAVE_MANPAGES_STYLESHEET" = "xyes"])
  
++if test "x$INTEL" != "xno" -o "x$RADEON" != "xno" -o "x$NOUVEAU" != "xno" -o "x$OMAP" != "xno" -o "x$FREEDRENO" != "xno" -o "x$VIGS" != "xno"; then
++    # Check for atomic intrinsics
++    AC_CACHE_CHECK([for native atomic primitives], drm_cv_atomic_primitives,
++    [
++	    drm_cv_atomic_primitives="none"
++
++	    AC_LINK_IFELSE([AC_LANG_PROGRAM([[
++    int atomic_add(int i) { return __sync_fetch_and_add (&i, 1); }
++    int atomic_cmpxchg(int i, int j, int k) { return __sync_val_compare_and_swap (&i, j, k); }
++                                            ]],[[]])],
++                           [drm_cv_atomic_primitives="Intel"],[])
++
++	    if test "x$drm_cv_atomic_primitives" = "xnone"; then
++		    AC_CHECK_HEADER([atomic_ops.h], drm_cv_atomic_primitives="libatomic-ops")
++	    fi
++
++	    # atomic functions defined in <atomic.h> & libc on Solaris
++	    if test "x$drm_cv_atomic_primitives" = "xnone"; then
++		    AC_CHECK_FUNC([atomic_cas_uint],
++				  drm_cv_atomic_primitives="Solaris")
++	    fi
++
++    ])
++    if test "x$drm_cv_atomic_primitives" = xIntel; then
++	    AC_DEFINE(HAVE_LIBDRM_ATOMIC_PRIMITIVES, 1,
++		      [Enable if your compiler supports the Intel __sync_* atomic primitives])
++    fi
++    if test "x$drm_cv_atomic_primitives" = "xlibatomic-ops"; then
++	    AC_DEFINE(HAVE_LIB_ATOMIC_OPS, 1, [Enable if you have libatomic-ops-dev installed])
++    fi
++
++    if test "x$drm_cv_atomic_primitives" = "xnone"; then
++           if test "x$INTEL" != "xauto"; then
++                   if test "x$INTEL" != "xno"; then
++                        AC_MSG_ERROR([libdrm_intel depends upon atomic operations, which were not found for your compiler/cpu. Try compiling with -march=native, or install the libatomics-op-dev package, or, failing both of those, disable support for Intel GPUs by passing --disable-intel to ./configure])
++                   fi
++           else
++                   AC_MSG_WARN([Disabling libdrm_intel. It depends on atomic operations, which were not found for your compiler/cpu. Try compiling with -march=native, or install the libatomics-op-dev package.])
++                   INTEL=no
++           fi
++           if test "x$RADEON" != "xauto"; then
++                   if test "x$RADEON" != "xno"; then
++                        AC_MSG_ERROR([libdrm_radeon depends upon atomic operations, which were not found for your compiler/cpu. Try compiling with -march=native, or install the libatomics-op-dev package, or, failing both of those, disable support for Radeon support by passing --disable-radeon to ./configure])
++                   fi
++           else
++                   AC_MSG_WARN([Disabling libdrm_radeon. It depends on atomic operations, which were not found for your compiler/cpu. Try compiling with -march=native, or install the libatomics-op-dev package.])
++                   RADEON=no
++           fi
++           if test "x$NOUVEAU" != "xauto"; then
++                   if test "x$NOUVEAU" != "xno"; then
++                        AC_MSG_ERROR([libdrm_nouveau depends upon atomic operations, which were not found for your compiler/cpu. Try compiling with -march=native, or install the libatomics-op-dev package, or, failing both of those, disable support for NVIDIA GPUs by passing --disable-nouveau to ./configure])
++                   fi
++           else
++                   AC_MSG_WARN([Disabling libdrm_nouveau. It depends on atomic operations, which were not found for your compiler/cpu. Try compiling with -march=native, or install the libatomics-op-dev package.])
++                   NOUVEAU=no
++           fi
++    else
++           if test "x$INTEL" != "xno"; then
++                   case $host_cpu in
++                           i?86|x86_64) INTEL=yes ;;
++                           *) INTEL=no ;;
++                   esac
++           fi
++           if test "x$RADEON" != "xno"; then
++                   RADEON=yes
++           fi
++           if test "x$NOUVEAU" != "xno"; then
++                   NOUVEAU=yes
++           fi
++    fi
++fi
++
++if test "x$VIGS" != "xno"; then
++	AC_DEFINE(HAVE_VIGS, 1, [Have VIGS])
++fi
++
++if test "x$INTEL" != "xno"; then
++	PKG_CHECK_MODULES(PCIACCESS, [pciaccess >= 0.10])
++fi
++AC_SUBST(PCIACCESS_CFLAGS)
++AC_SUBST(PCIACCESS_LIBS)
++
+ PKG_CHECK_MODULES(VALGRIND, [valgrind], [have_valgrind=yes], [have_valgrind=no])
+ if test "x$have_valgrind" = "xyes"; then
+ 	AC_DEFINE([HAVE_VALGRIND], 1, [Use valgrind intrinsics to suppress false warnings])
+ fi
+ 
++AM_CONDITIONAL(HAVE_INTEL, [test "x$INTEL" != "xno"])
++AM_CONDITIONAL(HAVE_RADEON, [test "x$RADEON" != "xno"])
++AM_CONDITIONAL(HAVE_NOUVEAU, [test "x$NOUVEAU" != "xno"])
++if test "x$RADEON" = xyes; then
++	AC_DEFINE(HAVE_RADEON, 1, [Have radeon support])
++fi
++AM_CONDITIONAL(HAVE_VIGS, [test "x$VIGS" != "xno"])
++
  AC_ARG_WITH([kernel-source],
              [AS_HELP_STRING([--with-kernel-source],
-@@ -383,6 +389,8 @@ AC_CONFIG_FILES([
+               [specify path to linux kernel source])],
+@@ -403,6 +498,8 @@ AC_CONFIG_FILES([
  	exynos/libdrm_exynos.pc
  	freedreno/Makefile
  	freedreno/libdrm_freedreno.pc
@@ -48,18 +166,69 @@ index 1c78c45..50557b9 100644
  	tests/Makefile
  	tests/modeprint/Makefile
  	tests/modetest/Makefile
-@@ -407,4 +415,5 @@ echo "  Nouveau API    $NOUVEAU"
+@@ -425,4 +522,5 @@ echo "  Nouveau API    $NOUVEAU"
  echo "  OMAP API       $OMAP"
  echo "  EXYNOS API     $EXYNOS"
  echo "  Freedreno API  $FREEDRENO"
 +echo "  VIGS API       $VIGS"
  echo ""
+diff --git a/include/drm/Makefile.am b/include/drm/Makefile.am
+new file mode 100644
+index 0000000..5f9695f
+--- /dev/null
++++ b/include/drm/Makefile.am
+@@ -0,0 +1,45 @@
++#  Copyright 2005 Adam Jackson.
++#
++#  Permission is hereby granted, free of charge, to any person obtaining a
++#  copy of this software and associated documentation files (the "Software"),
++#  to deal in the Software without restriction, including without limitation
++#  on the rights to use, copy, modify, merge, publish, distribute, sub
++#  license, and/or sell copies of the Software, and to permit persons to whom
++#  the Software is furnished to do so, subject to the following conditions:
++#
++#  The above copyright notice and this permission notice (including the next
++#  paragraph) shall be included in all copies or substantial portions of the
++#  Software.
++#
++#  THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
++#  IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
++#  FITNESS FOR A PARTICULAR PURPOSE AND NON-INFRINGEMENT.  IN NO EVENT SHALL
++#  ADAM JACKSON BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER
++#  IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
++#  CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
++
++# XXX airlied says, nothing besides *_drm.h and drm*.h should be necessary.
++# however, r300 and via need their reg headers installed in order to build.
++# better solutions are welcome.
++
++klibdrmincludedir = ${includedir}/libdrm
++klibdrminclude_HEADERS = \
++	drm.h \
++	drm_mode.h \
++	drm_fourcc.h \
++	drm_sarea.h \
++	i915_drm.h \
++	mga_drm.h \
++	nouveau_drm.h \
++	r128_drm.h \
++	radeon_drm.h \
++	savage_drm.h \
++	sis_drm.h \
++	via_drm.h \
++	mach64_drm.h \
++	qxl_drm.h \
++	vigs_drm.h
++
++if HAVE_VMWGFX
++klibdrminclude_HEADERS += vmwgfx_drm.h
++endif
 diff --git a/include/drm/vigs_drm.h b/include/drm/vigs_drm.h
 new file mode 100644
-index 0000000..24f2a43
+index 0000000..a31053e
 --- /dev/null
 +++ b/include/drm/vigs_drm.h
-@@ -0,0 +1,242 @@
+@@ -0,0 +1,136 @@
 +/*
 + * vigs_drm.h
 + */
@@ -95,7 +264,7 @@ index 0000000..24f2a43
 +/*
 + * Bump this whenever driver interface changes.
 + */
-+#define DRM_VIGS_DRIVER_VERSION 14
++#define DRM_VIGS_DRIVER_VERSION 9
 +
 +/*
 + * Surface access flags.
@@ -103,17 +272,6 @@ index 0000000..24f2a43
 +#define DRM_VIGS_SAF_READ 1
 +#define DRM_VIGS_SAF_WRITE 2
 +#define DRM_VIGS_SAF_MASK 3
-+
-+/*
-+ * Number of DP framebuffers.
-+ */
-+#define DRM_VIGS_NUM_DP_FB_BUF 4
-+
-+/*
-+ * DP memory types.
-+ */
-+#define DRM_VIGS_DP_FB_Y 2
-+#define DRM_VIGS_DP_FB_C 3
 +
 +struct drm_vigs_get_protocol_version
 +{
@@ -126,7 +284,6 @@ index 0000000..24f2a43
 +    uint32_t height;
 +    uint32_t stride;
 +    uint32_t format;
-+    int scanout;
 +    uint32_t handle;
 +    uint32_t size;
 +    uint32_t id;
@@ -145,11 +302,6 @@ index 0000000..24f2a43
 +    unsigned long address;
 +};
 +
-+struct drm_vigs_gem_wait
-+{
-+    uint32_t handle;
-+};
-+
 +struct drm_vigs_surface_info
 +{
 +    uint32_t handle;
@@ -157,7 +309,6 @@ index 0000000..24f2a43
 +    uint32_t height;
 +    uint32_t stride;
 +    uint32_t format;
-+    int scanout;
 +    uint32_t size;
 +    uint32_t id;
 +};
@@ -184,84 +335,15 @@ index 0000000..24f2a43
 +    int sync;
 +};
 +
-+struct drm_vigs_create_fence
-+{
-+    int send;
-+    uint32_t handle;
-+    uint32_t seq;
-+};
-+
-+struct drm_vigs_fence_wait
-+{
-+    uint32_t handle;
-+};
-+
-+struct drm_vigs_fence_signaled
-+{
-+    uint32_t handle;
-+    int signaled;
-+};
-+
-+struct drm_vigs_fence_unref
-+{
-+    uint32_t handle;
-+};
-+
-+struct drm_vigs_plane_set_zpos
-+{
-+    uint32_t plane_id;
-+    int zpos;
-+};
-+
-+struct drm_vigs_plane_set_transform
-+{
-+    uint32_t plane_id;
-+    int hflip;
-+    int vflip;
-+    int rotation;
-+};
-+
-+struct drm_vigs_dp_create_surface
-+{
-+    uint32_t dp_plane;
-+    uint32_t dp_fb_buf;
-+    uint32_t dp_mem_flag;
-+    uint32_t width;
-+    uint32_t height;
-+    uint32_t stride;
-+    uint32_t format;
-+    uint32_t handle;
-+    uint32_t size;
-+    uint32_t id;
-+};
-+
-+struct drm_vigs_dp_open_surface
-+{
-+    uint32_t dp_plane;
-+    uint32_t dp_fb_buf;
-+    uint32_t dp_mem_flag;
-+    uint32_t handle;
-+};
-+
 +#define DRM_VIGS_GET_PROTOCOL_VERSION 0x00
 +#define DRM_VIGS_CREATE_SURFACE 0x01
 +#define DRM_VIGS_CREATE_EXECBUFFER 0x02
 +#define DRM_VIGS_GEM_MAP 0x03
-+#define DRM_VIGS_GEM_WAIT 0x04
-+#define DRM_VIGS_SURFACE_INFO 0x05
-+#define DRM_VIGS_EXEC 0x06
-+#define DRM_VIGS_SURFACE_SET_GPU_DIRTY 0x07
-+#define DRM_VIGS_SURFACE_START_ACCESS 0x08
-+#define DRM_VIGS_SURFACE_END_ACCESS 0x09
-+#define DRM_VIGS_CREATE_FENCE 0x0A
-+#define DRM_VIGS_FENCE_WAIT 0x0B
-+#define DRM_VIGS_FENCE_SIGNALED 0x0C
-+#define DRM_VIGS_FENCE_UNREF 0x0D
-+#define DRM_VIGS_PLANE_SET_ZPOS 0x0E
-+#define DRM_VIGS_PLANE_SET_TRANSFORM 0x0F
-+
-+#define DRM_VIGS_DP_CREATE_SURFACE 0x20
-+#define DRM_VIGS_DP_OPEN_SURFACE 0x21
++#define DRM_VIGS_SURFACE_INFO 0x04
++#define DRM_VIGS_EXEC 0x05
++#define DRM_VIGS_SURFACE_SET_GPU_DIRTY 0x06
++#define DRM_VIGS_SURFACE_START_ACCESS 0x07
++#define DRM_VIGS_SURFACE_END_ACCESS 0x08
 +
 +#define DRM_IOCTL_VIGS_GET_PROTOCOL_VERSION DRM_IOR(DRM_COMMAND_BASE + \
 +            DRM_VIGS_GET_PROTOCOL_VERSION, struct drm_vigs_get_protocol_version)
@@ -271,8 +353,6 @@ index 0000000..24f2a43
 +            DRM_VIGS_CREATE_EXECBUFFER, struct drm_vigs_create_execbuffer)
 +#define DRM_IOCTL_VIGS_GEM_MAP DRM_IOWR(DRM_COMMAND_BASE + \
 +            DRM_VIGS_GEM_MAP, struct drm_vigs_gem_map)
-+#define DRM_IOCTL_VIGS_GEM_WAIT DRM_IOW(DRM_COMMAND_BASE + \
-+            DRM_VIGS_GEM_WAIT, struct drm_vigs_gem_wait)
 +#define DRM_IOCTL_VIGS_SURFACE_INFO DRM_IOWR(DRM_COMMAND_BASE + \
 +            DRM_VIGS_SURFACE_INFO, struct drm_vigs_surface_info)
 +#define DRM_IOCTL_VIGS_EXEC DRM_IOW(DRM_COMMAND_BASE + \
@@ -283,28 +363,11 @@ index 0000000..24f2a43
 +            DRM_VIGS_SURFACE_START_ACCESS, struct drm_vigs_surface_start_access)
 +#define DRM_IOCTL_VIGS_SURFACE_END_ACCESS DRM_IOW(DRM_COMMAND_BASE + \
 +            DRM_VIGS_SURFACE_END_ACCESS, struct drm_vigs_surface_end_access)
-+#define DRM_IOCTL_VIGS_CREATE_FENCE DRM_IOWR(DRM_COMMAND_BASE + \
-+            DRM_VIGS_CREATE_FENCE, struct drm_vigs_create_fence)
-+#define DRM_IOCTL_VIGS_FENCE_WAIT DRM_IOW(DRM_COMMAND_BASE + \
-+            DRM_VIGS_FENCE_WAIT, struct drm_vigs_fence_wait)
-+#define DRM_IOCTL_VIGS_FENCE_SIGNALED DRM_IOWR(DRM_COMMAND_BASE + \
-+            DRM_VIGS_FENCE_SIGNALED, struct drm_vigs_fence_signaled)
-+#define DRM_IOCTL_VIGS_FENCE_UNREF DRM_IOW(DRM_COMMAND_BASE + \
-+            DRM_VIGS_FENCE_UNREF, struct drm_vigs_fence_unref)
-+#define DRM_IOCTL_VIGS_PLANE_SET_ZPOS DRM_IOW(DRM_COMMAND_BASE + \
-+            DRM_VIGS_PLANE_SET_ZPOS, struct drm_vigs_plane_set_zpos)
-+#define DRM_IOCTL_VIGS_PLANE_SET_TRANSFORM DRM_IOW(DRM_COMMAND_BASE + \
-+            DRM_VIGS_PLANE_SET_TRANSFORM, struct drm_vigs_plane_set_transform)
-+
-+#define DRM_IOCTL_VIGS_DP_CREATE_SURFACE DRM_IOWR(DRM_COMMAND_BASE + \
-+            DRM_VIGS_DP_CREATE_SURFACE, struct drm_vigs_dp_create_surface)
-+#define DRM_IOCTL_VIGS_DP_OPEN_SURFACE DRM_IOWR(DRM_COMMAND_BASE + \
-+            DRM_VIGS_DP_OPEN_SURFACE, struct drm_vigs_dp_open_surface)
 +
 +#endif
 diff --git a/vigs/Makefile.am b/vigs/Makefile.am
 new file mode 100644
-index 0000000..fdc7740
+index 0000000..dd35bc4
 --- /dev/null
 +++ b/vigs/Makefile.am
 @@ -0,0 +1,24 @@
@@ -322,7 +385,7 @@ index 0000000..fdc7740
 +
 +libdrm_vigs_la_LTLIBRARIES = libdrm_vigs.la
 +libdrm_vigs_ladir = $(libdir)
-+libdrm_vigs_la_LDFLAGS = -version-number 9:0:0 -no-undefined
++libdrm_vigs_la_LDFLAGS = -version-number 4:0:0 -no-undefined
 +libdrm_vigs_la_LIBADD = ../libdrm.la @PTHREADSTUBS_LIBS@
 +
 +libdrm_vigs_la_SOURCES = vigs.c
@@ -332,23 +395,6 @@ index 0000000..fdc7740
 +
 +pkgconfigdir = @pkgconfigdir@
 +pkgconfig_DATA = libdrm_vigs.pc
-diff --git a/vigs/libdrm_vigs.pc b/vigs/libdrm_vigs.pc
-new file mode 100644
-index 0000000..6dc7e3f
---- /dev/null
-+++ b/vigs/libdrm_vigs.pc
-@@ -0,0 +1,11 @@
-+prefix=/usr/local
-+exec_prefix=${prefix}
-+libdir=${exec_prefix}/lib
-+includedir=${prefix}/include
-+
-+Name: libdrm_vigs
-+Description: Userspace interface to VIGS kernel DRM services
-+Version: 2.4.35
-+Libs: -L${libdir} -ldrm_vigs
-+Cflags: -I${includedir} -I${includedir}/libdrm -I${includedir}/vigs
-+Requires.private: libdrm
 diff --git a/vigs/libdrm_vigs.pc.in b/vigs/libdrm_vigs.pc.in
 new file mode 100644
 index 0000000..676e82d
@@ -368,10 +414,10 @@ index 0000000..676e82d
 +Requires.private: libdrm
 diff --git a/vigs/vigs.c b/vigs/vigs.c
 new file mode 100644
-index 0000000..33a59d7
+index 0000000..5530d48
 --- /dev/null
 +++ b/vigs/vigs.c
-@@ -0,0 +1,823 @@
+@@ -0,0 +1,516 @@
 +/* vigs.c
 + *
 + * Copyright (c) 2013 Samsung Electronics Co., Ltd.
@@ -445,13 +491,6 @@ index 0000000..33a59d7
 +    struct vigs_drm_gem_info gem_info;
 +
 +    struct vigs_drm_execbuffer base;
-+};
-+
-+struct vigs_drm_fence_impl
-+{
-+    struct vigs_drm_fence base;
-+
-+    atomic_t ref_count;
 +};
 +
 +static void vigs_drm_gem_close(struct vigs_drm_device *dev, uint32_t handle)
@@ -638,29 +677,11 @@ index 0000000..33a59d7
 +    gem->vaddr = NULL;
 +}
 +
-+int vigs_drm_gem_wait(struct vigs_drm_gem *gem)
-+{
-+    struct drm_vigs_gem_wait req =
-+    {
-+        .handle = gem->handle,
-+    };
-+    int ret;
-+
-+    ret = drmIoctl(gem->dev->fd, DRM_IOCTL_VIGS_GEM_WAIT, &req);
-+
-+    if (ret != 0) {
-+        return -errno;
-+    }
-+
-+    return 0;
-+}
-+
 +int vigs_drm_surface_create(struct vigs_drm_device *dev,
 +                            uint32_t width,
 +                            uint32_t height,
 +                            uint32_t stride,
 +                            uint32_t format,
-+                            int scanout,
 +                            struct vigs_drm_surface **sfc)
 +{
 +    struct vigs_drm_surface_impl *sfc_impl;
@@ -670,7 +691,6 @@ index 0000000..33a59d7
 +        .height = height,
 +        .stride = stride,
 +        .format = format,
-+        .scanout = scanout,
 +    };
 +    int ret;
 +
@@ -698,7 +718,6 @@ index 0000000..33a59d7
 +    sfc_impl->base.height = height;
 +    sfc_impl->base.stride = stride;
 +    sfc_impl->base.format = format;
-+    sfc_impl->base.scanout = scanout;
 +    sfc_impl->base.id = req.id;
 +
 +    *sfc = &sfc_impl->base;
@@ -758,7 +777,6 @@ index 0000000..33a59d7
 +    sfc_impl->base.height = info_req.height;
 +    sfc_impl->base.stride = info_req.stride;
 +    sfc_impl->base.format = info_req.format;
-+    sfc_impl->base.scanout = info_req.scanout;
 +    sfc_impl->base.id = info_req.id;
 +
 +    *sfc = &sfc_impl->base;
@@ -916,291 +934,12 @@ index 0000000..33a59d7
 +
 +    return (ret != 0) ? -errno : 0;
 +}
-+
-+int vigs_drm_fence_create(struct vigs_drm_device *dev,
-+                          int send,
-+                          struct vigs_drm_fence **fence)
-+{
-+    struct vigs_drm_fence_impl *fence_impl;
-+    struct drm_vigs_create_fence req =
-+    {
-+        .send = send
-+    };
-+    int ret;
-+
-+    fence_impl = calloc(sizeof(*fence_impl), 1);
-+
-+    if (!fence_impl) {
-+        ret = -ENOMEM;
-+        goto fail1;
-+    }
-+
-+    ret = drmIoctl(dev->fd, DRM_IOCTL_VIGS_CREATE_FENCE, &req);
-+
-+    if (ret != 0) {
-+        ret = -errno;
-+        goto fail2;
-+    }
-+
-+    atomic_set(&fence_impl->ref_count, 1);
-+    fence_impl->base.dev = dev;
-+    fence_impl->base.handle = req.handle;
-+    fence_impl->base.seq = req.seq;
-+    fence_impl->base.signaled = 0;
-+
-+    *fence = &fence_impl->base;
-+
-+    return 0;
-+
-+fail2:
-+    free(fence_impl);
-+fail1:
-+    *fence = NULL;
-+
-+    return ret;
-+}
-+
-+void vigs_drm_fence_ref(struct vigs_drm_fence *fence)
-+{
-+    struct vigs_drm_fence_impl *fence_impl;
-+
-+    if (!fence) {
-+        return;
-+    }
-+
-+    fence_impl = vigs_containerof(fence, struct vigs_drm_fence_impl, base);
-+
-+    atomic_inc(&fence_impl->ref_count);
-+}
-+
-+void vigs_drm_fence_unref(struct vigs_drm_fence *fence)
-+{
-+    struct vigs_drm_fence_impl *fence_impl;
-+    struct drm_vigs_fence_unref req;
-+
-+    if (!fence) {
-+        return;
-+    }
-+
-+    fence_impl = vigs_containerof(fence, struct vigs_drm_fence_impl, base);
-+
-+    assert(atomic_read(&fence_impl->ref_count) > 0);
-+    if (!atomic_dec_and_test(&fence_impl->ref_count)) {
-+        return;
-+    }
-+
-+    req.handle = fence->handle;
-+
-+    drmIoctl(fence->dev->fd, DRM_IOCTL_VIGS_FENCE_UNREF, &req);
-+
-+    free(fence_impl);
-+}
-+
-+int vigs_drm_fence_wait(struct vigs_drm_fence *fence)
-+{
-+    struct drm_vigs_fence_wait req =
-+    {
-+        .handle = fence->handle
-+    };
-+    int ret;
-+
-+    ret = drmIoctl(fence->dev->fd, DRM_IOCTL_VIGS_FENCE_WAIT, &req);
-+
-+    return (ret != 0) ? -errno : 0;
-+}
-+
-+int vigs_drm_fence_check(struct vigs_drm_fence *fence)
-+{
-+    struct drm_vigs_fence_signaled req =
-+    {
-+        .handle = fence->handle
-+    };
-+    int ret;
-+
-+    if (fence->signaled) {
-+        return 0;
-+    }
-+
-+    ret = drmIoctl(fence->dev->fd, DRM_IOCTL_VIGS_FENCE_SIGNALED, &req);
-+
-+    if (ret != 0) {
-+        return -errno;
-+    }
-+
-+    fence->signaled = req.signaled;
-+
-+    return 0;
-+}
-+
-+int vigs_drm_plane_set_zpos(struct vigs_drm_device *dev,
-+                            uint32_t plane_id,
-+                            int zpos)
-+{
-+    struct drm_vigs_plane_set_zpos req =
-+    {
-+        .plane_id = plane_id,
-+        .zpos = zpos
-+    };
-+    int ret;
-+
-+    ret = drmIoctl(dev->fd, DRM_IOCTL_VIGS_PLANE_SET_ZPOS, &req);
-+
-+    return (ret != 0) ? -errno : 0;
-+}
-+
-+int vigs_drm_plane_set_transform(struct vigs_drm_device *dev,
-+                                 uint32_t plane_id,
-+                                 int hflip,
-+                                 int vflip,
-+                                 vigs_drm_rotation rotation)
-+{
-+    struct drm_vigs_plane_set_transform req =
-+    {
-+        .plane_id = plane_id,
-+        .hflip = hflip,
-+        .vflip = vflip,
-+        .rotation = rotation
-+    };
-+    int ret;
-+
-+    ret = drmIoctl(dev->fd, DRM_IOCTL_VIGS_PLANE_SET_TRANSFORM, &req);
-+
-+    return (ret != 0) ? -errno : 0;
-+}
-+
-+int vigs_drm_dp_surface_create(struct vigs_drm_device *dev,
-+                               uint32_t dp_plane,
-+                               uint32_t dp_fb_buf,
-+                               uint32_t dp_mem_flag,
-+                               uint32_t width,
-+                               uint32_t height,
-+                               uint32_t stride,
-+                               uint32_t format,
-+                               struct vigs_drm_surface **sfc)
-+{
-+    struct vigs_drm_surface_impl *sfc_impl;
-+    struct drm_vigs_dp_create_surface req =
-+    {
-+        .dp_plane = dp_plane,
-+        .dp_fb_buf = dp_fb_buf,
-+        .dp_mem_flag = dp_mem_flag,
-+        .width = width,
-+        .height = height,
-+        .stride = stride,
-+        .format = format,
-+    };
-+    int ret;
-+
-+    sfc_impl = calloc(sizeof(*sfc_impl), 1);
-+
-+    if (!sfc_impl) {
-+        ret = -ENOMEM;
-+        goto fail1;
-+    }
-+
-+    ret = drmIoctl(dev->fd, DRM_IOCTL_VIGS_DP_CREATE_SURFACE, &req);
-+
-+    if (ret != 0) {
-+        ret = -errno;
-+        goto fail2;
-+    }
-+
-+    vigs_drm_gem_impl_init((struct vigs_drm_gem_impl*)sfc_impl,
-+                           dev,
-+                           req.handle,
-+                           req.size,
-+                           0);
-+
-+    sfc_impl->base.width = width;
-+    sfc_impl->base.height = height;
-+    sfc_impl->base.stride = stride;
-+    sfc_impl->base.format = format;
-+    sfc_impl->base.scanout = 0;
-+    sfc_impl->base.id = req.id;
-+
-+    *sfc = &sfc_impl->base;
-+
-+    return 0;
-+
-+fail2:
-+    free(sfc_impl);
-+fail1:
-+    *sfc = NULL;
-+
-+    return ret;
-+}
-+
-+int vigs_drm_dp_surface_open(struct vigs_drm_device *dev,
-+                             uint32_t dp_plane,
-+                             uint32_t dp_fb_buf,
-+                             uint32_t dp_mem_flag,
-+                             struct vigs_drm_surface **sfc)
-+{
-+    struct vigs_drm_surface_impl *sfc_impl;
-+    struct drm_vigs_dp_open_surface req =
-+    {
-+        .dp_plane = dp_plane,
-+        .dp_fb_buf = dp_fb_buf,
-+        .dp_mem_flag = dp_mem_flag
-+    };
-+    struct drm_vigs_surface_info info_req;
-+    int ret;
-+
-+    sfc_impl = calloc(sizeof(*sfc_impl), 1);
-+
-+    if (!sfc_impl) {
-+        ret = -ENOMEM;
-+        goto fail1;
-+    }
-+
-+    ret = drmIoctl(dev->fd, DRM_IOCTL_VIGS_DP_OPEN_SURFACE, &req);
-+
-+    if (ret != 0) {
-+        ret = -errno;
-+        goto fail2;
-+    }
-+
-+    info_req.handle = req.handle;
-+
-+    ret = drmIoctl(dev->fd, DRM_IOCTL_VIGS_SURFACE_INFO, &info_req);
-+
-+    if (ret != 0) {
-+        ret = -errno;
-+        goto fail3;
-+    }
-+
-+    vigs_drm_gem_impl_init((struct vigs_drm_gem_impl*)sfc_impl,
-+                           dev,
-+                           req.handle,
-+                           info_req.size,
-+                           0);
-+
-+    sfc_impl->base.width = info_req.width;
-+    sfc_impl->base.height = info_req.height;
-+    sfc_impl->base.stride = info_req.stride;
-+    sfc_impl->base.format = info_req.format;
-+    sfc_impl->base.scanout = info_req.scanout;
-+    sfc_impl->base.id = info_req.id;
-+
-+    *sfc = &sfc_impl->base;
-+
-+    return 0;
-+
-+fail3:
-+    vigs_drm_gem_close(dev, req.handle);
-+fail2:
-+    free(sfc_impl);
-+fail1:
-+    *sfc = NULL;
-+
-+    return ret;
-+}
 diff --git a/vigs/vigs.h b/vigs/vigs.h
 new file mode 100644
-index 0000000..7453431
+index 0000000..681031a
 --- /dev/null
 +++ b/vigs/vigs.h
-@@ -0,0 +1,293 @@
+@@ -0,0 +1,192 @@
 +/* vigs.h
 + *
 + * Copyright (c) 2013 Samsung Electronics Co., Ltd.
@@ -1247,17 +986,6 @@ index 0000000..7453431
 +} vigs_drm_surface_format;
 +
 +/*
-+ * Rotations.
-+ */
-+typedef enum
-+{
-+    vigs_drm_rotation_0   = 0x0,
-+    vigs_drm_rotation_90  = 0x1,
-+    vigs_drm_rotation_180 = 0x2,
-+    vigs_drm_rotation_270 = 0x3,
-+} vigs_drm_rotation;
-+
-+/*
 + * Surface access flags.
 + */
 +#define VIGS_DRM_SAF_READ 1
@@ -1295,28 +1023,12 @@ index 0000000..7453431
 +    uint32_t height;
 +    uint32_t stride;
 +    uint32_t format;
-+    int scanout;
 +    uint32_t id;
 +};
 +
 +struct vigs_drm_execbuffer
 +{
 +    struct vigs_drm_gem gem;
-+};
-+
-+struct vigs_drm_fence
-+{
-+    /* VIGS device object. */
-+    struct vigs_drm_device *dev;
-+
-+    /* a handle to fence object. */
-+    uint32_t handle;
-+
-+    /* fence sequence number. */
-+    uint32_t seq;
-+
-+    /* is fence signaled ? updated on 'vigs_drm_fence_check'. */
-+    int signaled;
 +};
 +
 +/*
@@ -1364,8 +1076,6 @@ index 0000000..7453431
 +
 +void vigs_drm_gem_unmap(struct vigs_drm_gem *gem);
 +
-+int vigs_drm_gem_wait(struct vigs_drm_gem *gem);
-+
 +/*
 + * @}
 + */
@@ -1380,7 +1090,6 @@ index 0000000..7453431
 +                            uint32_t height,
 +                            uint32_t stride,
 +                            uint32_t format,
-+                            int scanout,
 +                            struct vigs_drm_surface **sfc);
 +
 +int vigs_drm_surface_open(struct vigs_drm_device *dev,
@@ -1413,77 +1122,6 @@ index 0000000..7453431
 +                             struct vigs_drm_execbuffer **execbuffer);
 +
 +int vigs_drm_execbuffer_exec(struct vigs_drm_execbuffer *execbuffer);
-+
-+/*
-+ * @}
-+ */
-+
-+/*
-+ * Fence functions.
-+ * @{
-+ */
-+
-+int vigs_drm_fence_create(struct vigs_drm_device *dev,
-+                          int send,
-+                          struct vigs_drm_fence **fence);
-+
-+/*
-+ * Passing NULL won't hurt, this is for convenience.
-+ */
-+void vigs_drm_fence_ref(struct vigs_drm_fence *fence);
-+
-+/*
-+ * Passing NULL won't hurt, this is for convenience.
-+ */
-+void vigs_drm_fence_unref(struct vigs_drm_fence *fence);
-+
-+int vigs_drm_fence_wait(struct vigs_drm_fence *fence);
-+
-+int vigs_drm_fence_check(struct vigs_drm_fence *fence);
-+
-+/*
-+ * @}
-+ */
-+
-+/*
-+ * Plane functions.
-+ * @{
-+ */
-+
-+int vigs_drm_plane_set_zpos(struct vigs_drm_device *dev,
-+                            uint32_t plane_id,
-+                            int zpos);
-+
-+int vigs_drm_plane_set_transform(struct vigs_drm_device *dev,
-+                                 uint32_t plane_id,
-+                                 int hflip,
-+                                 int vflip,
-+                                 vigs_drm_rotation rotation);
-+
-+/*
-+ * @}
-+ */
-+
-+/*
-+ * DP functions.
-+ * @{
-+ */
-+
-+int vigs_drm_dp_surface_create(struct vigs_drm_device *dev,
-+                               uint32_t dp_plane,
-+                               uint32_t dp_fb_buf,
-+                               uint32_t dp_mem_flag,
-+                               uint32_t width,
-+                               uint32_t height,
-+                               uint32_t stride,
-+                               uint32_t format,
-+                               struct vigs_drm_surface **sfc);
-+
-+int vigs_drm_dp_surface_open(struct vigs_drm_device *dev,
-+                             uint32_t dp_plane,
-+                             uint32_t dp_fb_buf,
-+                             uint32_t dp_mem_flag,
-+                             struct vigs_drm_surface **sfc);
 +
 +/*
 + * @}

@@ -1,0 +1,141 @@
+From: Stanislav Vorobiov <s.vorobiov@samsung.com>
+Date: Fri, 22 Aug 2014 10:53:59 +0400
+Subject: VIGS: Implement plane flip/rotate
+
+Planes can now be horizontally/vertically flipped
+and rotated by 90, 180 or 270 degrees
+
+Change-Id: I3db7dc3854add2b777e41aed54039a0d2323e0b1
+Signed-off-by: Stanislav Vorobiov <s.vorobiov@samsung.com>
+Signed-off-by: Vasiliy Ulyanov <v.ulyanov@samsung.com>
+---
+ include/drm/vigs_drm.h | 13 ++++++++++++-
+ vigs/Makefile.am       |  2 +-
+ vigs/vigs.c            | 20 ++++++++++++++++++++
+ vigs/vigs.h            | 17 +++++++++++++++++
+ 4 files changed, 50 insertions(+), 2 deletions(-)
+
+diff --git a/include/drm/vigs_drm.h b/include/drm/vigs_drm.h
+index 7abf043..24f2a43 100644
+--- a/include/drm/vigs_drm.h
++++ b/include/drm/vigs_drm.h
+@@ -33,7 +33,7 @@
+ /*
+  * Bump this whenever driver interface changes.
+  */
+-#define DRM_VIGS_DRIVER_VERSION 13
++#define DRM_VIGS_DRIVER_VERSION 14
+ 
+ /*
+  * Surface access flags.
+@@ -151,6 +151,14 @@ struct drm_vigs_plane_set_zpos
+     int zpos;
+ };
+ 
++struct drm_vigs_plane_set_transform
++{
++    uint32_t plane_id;
++    int hflip;
++    int vflip;
++    int rotation;
++};
++
+ struct drm_vigs_dp_create_surface
+ {
+     uint32_t dp_plane;
+@@ -188,6 +196,7 @@ struct drm_vigs_dp_open_surface
+ #define DRM_VIGS_FENCE_SIGNALED 0x0C
+ #define DRM_VIGS_FENCE_UNREF 0x0D
+ #define DRM_VIGS_PLANE_SET_ZPOS 0x0E
++#define DRM_VIGS_PLANE_SET_TRANSFORM 0x0F
+ 
+ #define DRM_VIGS_DP_CREATE_SURFACE 0x20
+ #define DRM_VIGS_DP_OPEN_SURFACE 0x21
+@@ -222,6 +231,8 @@ struct drm_vigs_dp_open_surface
+             DRM_VIGS_FENCE_UNREF, struct drm_vigs_fence_unref)
+ #define DRM_IOCTL_VIGS_PLANE_SET_ZPOS DRM_IOW(DRM_COMMAND_BASE + \
+             DRM_VIGS_PLANE_SET_ZPOS, struct drm_vigs_plane_set_zpos)
++#define DRM_IOCTL_VIGS_PLANE_SET_TRANSFORM DRM_IOW(DRM_COMMAND_BASE + \
++            DRM_VIGS_PLANE_SET_TRANSFORM, struct drm_vigs_plane_set_transform)
+ 
+ #define DRM_IOCTL_VIGS_DP_CREATE_SURFACE DRM_IOWR(DRM_COMMAND_BASE + \
+             DRM_VIGS_DP_CREATE_SURFACE, struct drm_vigs_dp_create_surface)
+diff --git a/vigs/Makefile.am b/vigs/Makefile.am
+index 03f7d35..fdc7740 100644
+--- a/vigs/Makefile.am
++++ b/vigs/Makefile.am
+@@ -12,7 +12,7 @@ AM_CFLAGS = \
+ 
+ libdrm_vigs_la_LTLIBRARIES = libdrm_vigs.la
+ libdrm_vigs_ladir = $(libdir)
+-libdrm_vigs_la_LDFLAGS = -version-number 8:0:0 -no-undefined
++libdrm_vigs_la_LDFLAGS = -version-number 9:0:0 -no-undefined
+ libdrm_vigs_la_LIBADD = ../libdrm.la @PTHREADSTUBS_LIBS@
+ 
+ libdrm_vigs_la_SOURCES = vigs.c
+diff --git a/vigs/vigs.c b/vigs/vigs.c
+index 36236f7..33a59d7 100644
+--- a/vigs/vigs.c
++++ b/vigs/vigs.c
+@@ -674,6 +674,26 @@ int vigs_drm_plane_set_zpos(struct vigs_drm_device *dev,
+     return (ret != 0) ? -errno : 0;
+ }
+ 
++int vigs_drm_plane_set_transform(struct vigs_drm_device *dev,
++                                 uint32_t plane_id,
++                                 int hflip,
++                                 int vflip,
++                                 vigs_drm_rotation rotation)
++{
++    struct drm_vigs_plane_set_transform req =
++    {
++        .plane_id = plane_id,
++        .hflip = hflip,
++        .vflip = vflip,
++        .rotation = rotation
++    };
++    int ret;
++
++    ret = drmIoctl(dev->fd, DRM_IOCTL_VIGS_PLANE_SET_TRANSFORM, &req);
++
++    return (ret != 0) ? -errno : 0;
++}
++
+ int vigs_drm_dp_surface_create(struct vigs_drm_device *dev,
+                                uint32_t dp_plane,
+                                uint32_t dp_fb_buf,
+diff --git a/vigs/vigs.h b/vigs/vigs.h
+index 34e08db..7453431 100644
+--- a/vigs/vigs.h
++++ b/vigs/vigs.h
+@@ -44,6 +44,17 @@ typedef enum
+ } vigs_drm_surface_format;
+ 
+ /*
++ * Rotations.
++ */
++typedef enum
++{
++    vigs_drm_rotation_0   = 0x0,
++    vigs_drm_rotation_90  = 0x1,
++    vigs_drm_rotation_180 = 0x2,
++    vigs_drm_rotation_270 = 0x3,
++} vigs_drm_rotation;
++
++/*
+  * Surface access flags.
+  */
+ #define VIGS_DRM_SAF_READ 1
+@@ -240,6 +251,12 @@ int vigs_drm_plane_set_zpos(struct vigs_drm_device *dev,
+                             uint32_t plane_id,
+                             int zpos);
+ 
++int vigs_drm_plane_set_transform(struct vigs_drm_device *dev,
++                                 uint32_t plane_id,
++                                 int hflip,
++                                 int vflip,
++                                 vigs_drm_rotation rotation);
++
+ /*
+  * @}
+  */

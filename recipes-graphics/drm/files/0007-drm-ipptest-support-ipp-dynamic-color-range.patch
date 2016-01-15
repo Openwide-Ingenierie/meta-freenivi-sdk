@@ -1,0 +1,70 @@
+From: Donghwa Lee <dh09.lee@samsung.com>
+Date: Wed, 20 Aug 2014 10:11:22 +0900
+Subject: drm: ipptest: support ipp dynamic color range
+
+This patch supports dynamic range for color space conversion.
+COLOR_RANGE_LIMITED: selects narrow -> Y(16 to 235), Cb/Cr(16 to 240)
+COLOR_RANGE_FULL: selects wide -> Y/Cb/Cr(0 to 255), Wide default
+
+Change-Id: I94190ac3f3630904d2461e226d34378ac2b82b9d
+Signed-off-by: Donghwa Lee <dh09.lee@samsung.com>
+---
+ exynos/exynos_drm.h  | 10 ++++++++++
+ tests/ipptest/fimc.c |  2 ++
+ 2 files changed, 12 insertions(+)
+
+diff --git a/exynos/exynos_drm.h b/exynos/exynos_drm.h
+index b31d22f..b128196 100644
+--- a/exynos/exynos_drm.h
++++ b/exynos/exynos_drm.h
+@@ -275,6 +275,12 @@ enum drm_exynos_ipp_cmd {
+ 	IPP_CMD_MAX,
+ };
+ 
++/* define of color range */
++enum drm_exynos_color_range {
++	COLOR_RANGE_LIMITED,	/* Narrow: Y(16 to 235), Cb/Cr(16 to 240) */
++	COLOR_RANGE_FULL,	/* Wide: Y/Cb/Cr(0 to 255), Wide default */
++};
++
+ /**
+  * A structure for ipp property.
+  *
+@@ -283,6 +289,8 @@ enum drm_exynos_ipp_cmd {
+  * @ipp_id: id of ipp driver.
+  * @prop_id: id of property.
+  * @refresh_rate: refresh rate.
++ * @range: dynamic range for csc.
++ * @pad: just padding to be 64-bit aligned.
+  */
+ struct drm_exynos_ipp_property {
+ 	struct drm_exynos_ipp_config config[EXYNOS_DRM_OPS_MAX];
+@@ -290,6 +298,8 @@ struct drm_exynos_ipp_property {
+ 	__u32	ipp_id;
+ 	__u32	prop_id;
+ 	__u32	refresh_rate;
++	__u32	range;
++	__u32	pad;
+ };
+ 
+ /* definition of buffer */
+diff --git a/tests/ipptest/fimc.c b/tests/ipptest/fimc.c
+index f48c793..cf8fbb0 100644
+--- a/tests/ipptest/fimc.c
++++ b/tests/ipptest/fimc.c
+@@ -75,6 +75,7 @@ static int exynos_drm_ipp_set_property(int fd,
+ 		}
+ 		property->config[EXYNOS_DRM_OPS_DST].pos = scale_pos;
+ 		property->config[EXYNOS_DRM_OPS_DST].sz = dst_sz;
++		property->range = COLOR_RANGE_FULL;	/* Wide default */
+ 		break;
+ 	case IPP_CMD_WB:
+ 		property->config[EXYNOS_DRM_OPS_SRC].ops_id = EXYNOS_DRM_OPS_SRC;
+@@ -104,6 +105,7 @@ static int exynos_drm_ipp_set_property(int fd,
+ 		}
+ 		property->config[EXYNOS_DRM_OPS_DST].pos = scale_pos;
+ 		property->config[EXYNOS_DRM_OPS_DST].sz = dst_sz;
++		property->range = COLOR_RANGE_FULL;	/* Wide default */
+ 		break;
+ 	case IPP_CMD_OUTPUT:
+ 	default:

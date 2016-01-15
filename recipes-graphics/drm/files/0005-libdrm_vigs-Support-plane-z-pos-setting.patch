@@ -1,0 +1,116 @@
+From: Stanislav Vorobiov <s.vorobiov@samsung.com>
+Date: Tue, 18 Feb 2014 17:02:45 +0400
+Subject: libdrm_vigs: Support plane z-pos setting
+
+Change-Id: I2e1418425f1b4a17f49f19fabb8c4a2bdc84e5ef
+Signed-off-by: Stanislav Vorobiov <s.vorobiov@samsung.com>
+---
+ include/drm/vigs_drm.h | 11 ++++++++++-
+ vigs/Makefile.am       |  2 +-
+ vigs/vigs.c            | 16 ++++++++++++++++
+ vigs/vigs.h            | 13 +++++++++++++
+ 4 files changed, 40 insertions(+), 2 deletions(-)
+
+diff --git a/include/drm/vigs_drm.h b/include/drm/vigs_drm.h
+index 3eba112..1694801 100644
+--- a/include/drm/vigs_drm.h
++++ b/include/drm/vigs_drm.h
+@@ -33,7 +33,7 @@
+ /*
+  * Bump this whenever driver interface changes.
+  */
+-#define DRM_VIGS_DRIVER_VERSION 11
++#define DRM_VIGS_DRIVER_VERSION 12
+ 
+ /*
+  * Surface access flags.
+@@ -134,6 +134,12 @@ struct drm_vigs_fence_unref
+     uint32_t handle;
+ };
+ 
++struct drm_vigs_plane_set_zpos
++{
++    uint32_t plane_id;
++    int zpos;
++};
++
+ #define DRM_VIGS_GET_PROTOCOL_VERSION 0x00
+ #define DRM_VIGS_CREATE_SURFACE 0x01
+ #define DRM_VIGS_CREATE_EXECBUFFER 0x02
+@@ -148,6 +154,7 @@ struct drm_vigs_fence_unref
+ #define DRM_VIGS_FENCE_WAIT 0x0B
+ #define DRM_VIGS_FENCE_SIGNALED 0x0C
+ #define DRM_VIGS_FENCE_UNREF 0x0D
++#define DRM_VIGS_PLANE_SET_ZPOS 0x0E
+ 
+ #define DRM_IOCTL_VIGS_GET_PROTOCOL_VERSION DRM_IOR(DRM_COMMAND_BASE + \
+             DRM_VIGS_GET_PROTOCOL_VERSION, struct drm_vigs_get_protocol_version)
+@@ -177,5 +184,7 @@ struct drm_vigs_fence_unref
+             DRM_VIGS_FENCE_SIGNALED, struct drm_vigs_fence_signaled)
+ #define DRM_IOCTL_VIGS_FENCE_UNREF DRM_IOW(DRM_COMMAND_BASE + \
+             DRM_VIGS_FENCE_UNREF, struct drm_vigs_fence_unref)
++#define DRM_IOCTL_VIGS_PLANE_SET_ZPOS DRM_IOW(DRM_COMMAND_BASE + \
++            DRM_VIGS_PLANE_SET_ZPOS, struct drm_vigs_plane_set_zpos)
+ 
+ #endif
+diff --git a/vigs/Makefile.am b/vigs/Makefile.am
+index f15ceff..195bbf3 100644
+--- a/vigs/Makefile.am
++++ b/vigs/Makefile.am
+@@ -12,7 +12,7 @@ AM_CFLAGS = \
+ 
+ libdrm_vigs_la_LTLIBRARIES = libdrm_vigs.la
+ libdrm_vigs_ladir = $(libdir)
+-libdrm_vigs_la_LDFLAGS = -version-number 6:0:0 -no-undefined
++libdrm_vigs_la_LDFLAGS = -version-number 7:0:0 -no-undefined
+ libdrm_vigs_la_LIBADD = ../libdrm.la @PTHREADSTUBS_LIBS@
+ 
+ libdrm_vigs_la_SOURCES = vigs.c
+diff --git a/vigs/vigs.c b/vigs/vigs.c
+index f49d777..0e1a418 100644
+--- a/vigs/vigs.c
++++ b/vigs/vigs.c
+@@ -657,3 +657,19 @@ int vigs_drm_fence_check(struct vigs_drm_fence *fence)
+ 
+     return 0;
+ }
++
++int vigs_drm_plane_set_zpos(struct vigs_drm_device *dev,
++                            uint32_t plane_id,
++                            int zpos)
++{
++    struct drm_vigs_plane_set_zpos req =
++    {
++        .plane_id = plane_id,
++        .zpos = zpos
++    };
++    int ret;
++
++    ret = drmIoctl(dev->fd, DRM_IOCTL_VIGS_PLANE_SET_ZPOS, &req);
++
++    return (ret != 0) ? -errno : 0;
++}
+diff --git a/vigs/vigs.h b/vigs/vigs.h
+index 87c6b0f..0830090 100644
+--- a/vigs/vigs.h
++++ b/vigs/vigs.h
+@@ -231,6 +231,19 @@ int vigs_drm_fence_check(struct vigs_drm_fence *fence);
+  * @}
+  */
+ 
++/*
++ * Plane functions.
++ * @{
++ */
++
++int vigs_drm_plane_set_zpos(struct vigs_drm_device *dev,
++                            uint32_t plane_id,
++                            int zpos);
++
++/*
++ * @}
++ */
++
+ #ifdef __cplusplus
+ };
+ #endif /* __cplusplus */

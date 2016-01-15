@@ -1,0 +1,36 @@
+From: Quanxian Wang <quanxian.wang@intel.com>
+Date: Mon, 20 Oct 2014 13:23:49 +0800
+Subject: Update to 2.4.58
+
+Change-Id: I953e2dfa5f07fa512b73541171fc133d938b70be
+Signed-off-by: Quanxian Wang <quanxian.wang@intel.com>
+---
+ Makefile.am  | 2 +-
+ configure.ac | 1 -
+ 2 files changed, 1 insertion(+), 2 deletions(-)
+
+diff --git a/Makefile.am b/Makefile.am
+index efb9aa2..15692d6 100644
+--- a/Makefile.am
++++ b/Makefile.am
+@@ -57,7 +57,7 @@ if HAVE_VIGS
+ VIGS_SUBDIR = vigs
+ endif
+ 
+-SUBDIRS = . $(LIBKMS_SUBDIR) $(INTEL_SUBDIR) $(NOUVEAU_SUBDIR) $(RADEON_SUBDIR) $(OMAP_SUBDIR) $(EXYNOS_SUBDIR) $(FREEDRENO_SUBDIR) $(VIGS_SUBDIR) tests include man
++SUBDIRS = . $(LIBKMS_SUBDIR) $(INTEL_SUBDIR) $(NOUVEAU_SUBDIR) $(RADEON_SUBDIR) $(OMAP_SUBDIR) $(EXYNOS_SUBDIR) $(FREEDRENO_SUBDIR) $(VIGS_SUBDIR) tests man
+ 
+ libdrm_la_LTLIBRARIES = libdrm.la
+ libdrm_ladir = $(libdir)
+diff --git a/configure.ac b/configure.ac
+index c0fdd98..1a9608c 100644
+--- a/configure.ac
++++ b/configure.ac
+@@ -509,7 +509,6 @@ AC_CONFIG_FILES([
+ 	tests/exynos/Makefile
+ 	tests/ipptest/Makefile
+ 	tests/rottest/Makefile
+-	include/Makefile
+ 	include/drm/Makefile
+ 	man/Makefile
+ 	libdrm.pc])

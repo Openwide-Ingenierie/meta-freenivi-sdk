@@ -1,0 +1,4793 @@
+diff --git a/Makefile.am b/Makefile.am
+index 13df80c..16c1bec 100644
+--- a/Makefile.am
++++ b/Makefile.am
+@@ -69,6 +69,10 @@ if HAVE_FREEDRENO
+ FREEDRENO_SUBDIR = freedreno
+ endif
+ 
++if HAVE_VIGS
++VIGS_SUBDIR = vigs
++endif
++
+ if HAVE_TEGRA
+ TEGRA_SUBDIR = tegra
+ endif
+@@ -88,6 +92,7 @@ SUBDIRS = \
+ 	$(OMAP_SUBDIR) \
+ 	$(EXYNOS_SUBDIR) \
+ 	$(FREEDRENO_SUBDIR) \
++	$(VIGS_SUBDIR) \
+ 	$(TEGRA_SUBDIR) \
+ 	tests \
+ 	$(MAN_SUBDIR)
+diff --git a/configure.ac b/configure.ac
+index 1456b90..01eeadb 100644
+--- a/configure.ac
++++ b/configure.ac
+@@ -121,6 +121,11 @@ AC_ARG_ENABLE(tegra-experimental-api,
+ 	      [Enable support for Tegra's experimental API (default: disabled)]),
+ 	      [TEGRA=$enableval], [TEGRA=no])
+ 
++AC_ARG_ENABLE(vigs,
++	     AS_HELP_STRING([--disable-vigs],
++	     [Enable support for VIGS's API (default: enabled)]),
++	     [VIGS=$enableval], [VIGS=yes])
++
+ AC_ARG_ENABLE(install-test-programs,
+ 		  AS_HELP_STRING([--enable-install-test-programs],
+ 		  [Install test programs (default: no)]),
+@@ -407,6 +412,89 @@ AC_ARG_ENABLE(valgrind,
+               [AS_HELP_STRING([--enable-valgrind],
+                              [Build libdrm with  valgrind support (default: auto)])],
+                              [VALGRIND=$enableval], [VALGRIND=yes])
++
++if test "x$INTEL" != "xno" -o "x$RADEON" != "xno" -o "x$NOUVEAU" != "xno" -o "x$OMAP" != "xno" -o "x$FREEDRENO" != "xno" -o "x$VIGS" != "xno"; then
++    # Check for atomic intrinsics
++    AC_CACHE_CHECK([for native atomic primitives], drm_cv_atomic_primitives,
++    [
++	    drm_cv_atomic_primitives="none"
++
++	    AC_LINK_IFELSE([AC_LANG_PROGRAM([[
++    int atomic_add(int i) { return __sync_fetch_and_add (&i, 1); }
++    int atomic_cmpxchg(int i, int j, int k) { return __sync_val_compare_and_swap (&i, j, k); }
++                                            ]],[[]])],
++                           [drm_cv_atomic_primitives="Intel"],[])
++
++	    if test "x$drm_cv_atomic_primitives" = "xnone"; then
++		    AC_CHECK_HEADER([atomic_ops.h], drm_cv_atomic_primitives="libatomic-ops")
++	    fi
++
++	    # atomic functions defined in <atomic.h> & libc on Solaris
++	    if test "x$drm_cv_atomic_primitives" = "xnone"; then
++		    AC_CHECK_FUNC([atomic_cas_uint],
++				  drm_cv_atomic_primitives="Solaris")
++	    fi
++
++    ])
++    if test "x$drm_cv_atomic_primitives" = xIntel; then
++	    AC_DEFINE(HAVE_LIBDRM_ATOMIC_PRIMITIVES, 1,
++		      [Enable if your compiler supports the Intel __sync_* atomic primitives])
++    fi
++    if test "x$drm_cv_atomic_primitives" = "xlibatomic-ops"; then
++	    AC_DEFINE(HAVE_LIB_ATOMIC_OPS, 1, [Enable if you have libatomic-ops-dev installed])
++    fi
++
++    if test "x$drm_cv_atomic_primitives" = "xnone"; then
++           if test "x$INTEL" != "xauto"; then
++                   if test "x$INTEL" != "xno"; then
++                        AC_MSG_ERROR([libdrm_intel depends upon atomic operations, which were not found for your compiler/cpu. Try compiling with -march=native, or install the libatomics-op-dev package, or, failing both of those, disable support for Intel GPUs by passing --disable-intel to ./configure])
++                   fi
++           else
++                   AC_MSG_WARN([Disabling libdrm_intel. It depends on atomic operations, which were not found for your compiler/cpu. Try compiling with -march=native, or install the libatomics-op-dev package.])
++                   INTEL=no
++           fi
++           if test "x$RADEON" != "xauto"; then
++                   if test "x$RADEON" != "xno"; then
++                        AC_MSG_ERROR([libdrm_radeon depends upon atomic operations, which were not found for your compiler/cpu. Try compiling with -march=native, or install the libatomics-op-dev package, or, failing both of those, disable support for Radeon support by passing --disable-radeon to ./configure])
++                   fi
++           else
++                   AC_MSG_WARN([Disabling libdrm_radeon. It depends on atomic operations, which were not found for your compiler/cpu. Try compiling with -march=native, or install the libatomics-op-dev package.])
++                   RADEON=no
++           fi
++           if test "x$NOUVEAU" != "xauto"; then
++                   if test "x$NOUVEAU" != "xno"; then
++                        AC_MSG_ERROR([libdrm_nouveau depends upon atomic operations, which were not found for your compiler/cpu. Try compiling with -march=native, or install the libatomics-op-dev package, or, failing both of those, disable support for NVIDIA GPUs by passing --disable-nouveau to ./configure])
++                   fi
++           else
++                   AC_MSG_WARN([Disabling libdrm_nouveau. It depends on atomic operations, which were not found for your compiler/cpu. Try compiling with -march=native, or install the libatomics-op-dev package.])
++                   NOUVEAU=no
++           fi
++    else
++           if test "x$INTEL" != "xno"; then
++                   case $host_cpu in
++                           i?86|x86_64) INTEL=yes ;;
++                           *) INTEL=no ;;
++                   esac
++           fi
++           if test "x$RADEON" != "xno"; then
++                   RADEON=yes
++           fi
++           if test "x$NOUVEAU" != "xno"; then
++                   NOUVEAU=yes
++           fi
++    fi
++fi
++
++if test "x$VIGS" != "xno"; then
++	AC_DEFINE(HAVE_VIGS, 1, [Have VIGS])
++fi
++
++if test "x$INTEL" != "xno"; then
++	PKG_CHECK_MODULES(PCIACCESS, [pciaccess >= 0.10])
++fi
++AC_SUBST(PCIACCESS_CFLAGS)
++AC_SUBST(PCIACCESS_LIBS)
++
+ PKG_CHECK_MODULES(VALGRIND, [valgrind], [have_valgrind=yes], [have_valgrind=no])
+ AC_MSG_CHECKING([whether to enable Valgrind support])
+ if test "x$VALGRIND" = xauto; then
+@@ -422,6 +510,14 @@ fi
+ 
+ AC_MSG_RESULT([$VALGRIND])
+ 
++AM_CONDITIONAL(HAVE_INTEL, [test "x$INTEL" != "xno"])
++AM_CONDITIONAL(HAVE_RADEON, [test "x$RADEON" != "xno"])
++AM_CONDITIONAL(HAVE_NOUVEAU, [test "x$NOUVEAU" != "xno"])
++if test "x$RADEON" = xyes; then
++	AC_DEFINE(HAVE_RADEON, 1, [Have radeon support])
++fi
++AM_CONDITIONAL(HAVE_VIGS, [test "x$VIGS" != "xno"])
++
+ AC_ARG_WITH([kernel-source],
+             [AS_HELP_STRING([--with-kernel-source],
+               [specify path to linux kernel source])],
+@@ -454,6 +550,8 @@ AC_CONFIG_FILES([
+ 	exynos/libdrm_exynos.pc
+ 	freedreno/Makefile
+ 	freedreno/libdrm_freedreno.pc
++	vigs/Makefile
++	vigs/libdrm_vigs.pc
+ 	tegra/Makefile
+ 	tegra/libdrm_tegra.pc
+ 	tests/Makefile
+@@ -466,6 +564,9 @@ AC_CONFIG_FILES([
+ 	tests/exynos/Makefile
+ 	tests/tegra/Makefile
+ 	tests/nouveau/Makefile
++	tests/ipptest/Makefile
++	tests/rottest/Makefile
++	include/drm/Makefile
+ 	man/Makefile
+ 	libdrm.pc])
+ AC_OUTPUT
+@@ -481,5 +582,6 @@ echo "  Nouveau API    $NOUVEAU"
+ echo "  OMAP API       $OMAP"
+ echo "  EXYNOS API     $EXYNOS"
+ echo "  Freedreno API  $FREEDRENO (kgsl: $FREEDRENO_KGSL)"
++echo "  VIGS API       $VIGS"
+ echo "  Tegra API      $TEGRA"
+ echo ""
+diff --git a/exynos/exynos_drm.h b/exynos/exynos_drm.h
+index 256c02f..2ef2752 100644
+--- a/exynos/exynos_drm.h
++++ b/exynos/exynos_drm.h
+@@ -131,7 +131,254 @@ struct drm_exynos_g2d_exec {
+ 	__u64					async;
+ };
+ 
++/* definition of operations types */
++enum drm_exynos_ops_id {
++	EXYNOS_DRM_OPS_SRC,
++	EXYNOS_DRM_OPS_DST,
++	EXYNOS_DRM_OPS_MAX,
++};
++
++/* definition of size */
++struct drm_exynos_sz {
++	__u32	hsize;
++	__u32	vsize;
++};
++
++/* definition of position */
++struct drm_exynos_pos {
++	__u32	x;
++	__u32	y;
++	__u32	w;
++	__u32	h;
++};
++
++/* definition of flip */
++enum drm_exynos_flip {
++	EXYNOS_DRM_FLIP_NONE = (0 << 0),
++	EXYNOS_DRM_FLIP_VERTICAL = (1 << 0),
++	EXYNOS_DRM_FLIP_HORIZONTAL = (1 << 1),
++	EXYNOS_DRM_FLIP_BOTH = EXYNOS_DRM_FLIP_VERTICAL |
++			EXYNOS_DRM_FLIP_HORIZONTAL,
++};
++
++/* definition of rotation degree */
++enum drm_exynos_degree {
++	EXYNOS_DRM_DEGREE_0,
++	EXYNOS_DRM_DEGREE_90,
++	EXYNOS_DRM_DEGREE_180,
++	EXYNOS_DRM_DEGREE_270,
++};
++
++/* definition of planar */
++enum drm_exynos_planer {
++	EXYNOS_DRM_PLANAR_Y,
++	EXYNOS_DRM_PLANAR_CB,
++	EXYNOS_DRM_PLANAR_CR,
++	EXYNOS_DRM_PLANAR_MAX,
++};
++
++/* define of blending operation */
++enum drm_exynos_ipp_blending {
++	IPP_BLENDING_NO,
++	/* [0, 0] */
++	IPP_BLENDING_CLR,
++	/* [Sa, Sc] */
++	IPP_BLENDING_SRC,
++	/* [Da, Dc] */
++	IPP_BLENDING_DST,
++	/* [Sa + (1 - Sa)*Da, Rc = Sc + (1 - Sa)*Dc] */
++	IPP_BLENDING_SRC_OVER,
++	/* [Sa + (1 - Sa)*Da, Rc = Dc + (1 - Da)*Sc] */
++	IPP_BLENDING_DST_OVER,
++	/* [Sa * Da, Sc * Da] */
++	IPP_BLENDING_SRC_IN,
++	/* [Sa * Da, Sa * Dc] */
++	IPP_BLENDING_DST_IN,
++	/* [Sa * (1 - Da), Sc * (1 - Da)] */
++	IPP_BLENDING_SRC_OUT,
++	/* [Da * (1 - Sa), Dc * (1 - Sa)] */
++	IPP_BLENDING_DST_OUT,
++	/* [Da, Sc * Da + (1 - Sa) * Dc] */
++	IPP_BLENDING_SRC_ATOP,
++	/* [Sa, Sc * (1 - Da) + Sa * Dc ] */
++	IPP_BLENDING_DST_ATOP,
++	/* [-(Sa * Da), Sc * (1 - Da) + (1 - Sa) * Dc] */
++	IPP_BLENDING_XOR,
++	/* [Sa + Da - Sa*Da, Sc*(1 - Da) + Dc*(1 - Sa) + min(Sc, Dc)] */
++	IPP_BLENDING_DARKEN,
++	/* [Sa + Da - Sa*Da, Sc*(1 - Da) + Dc*(1 - Sa) + max(Sc, Dc)] */
++	IPP_BLENDING_LIGHTEN,
++	/* [Sa * Da, Sc * Dc] */
++	IPP_BLENDING_MULTIPLY,
++	/* [Sa + Da - Sa * Da, Sc + Dc - Sc * Dc] */
++	IPP_BLENDING_SCREEN,
++	/* Saturate(S + D) */
++	IPP_BLENDING_ADD,
++	/* Max */
++	IPP_BLENDING_MAX,
++};
++
++/* define of dithering operation */
++enum drm_exynos_ipp_dithering {
++	IPP_DITHERING_NO,
++	IPP_DITHERING_8BIT,
++	IPP_DITHERING_6BIT,
++	IPP_DITHERING_5BIT,
++	IPP_DITHERING_4BIT,
++	IPP_DITHERING_MAX,
++};
++
++/**
++ * A structure for ipp supported property list.
++ *
++ * @version: version of this structure.
++ * @ipp_id: id of ipp driver.
++ * @count: count of ipp driver.
++ * @writeback: flag of writeback supporting.
++ * @flip: flag of flip supporting.
++ * @degree: flag of degree information.
++ * @csc: flag of csc supporting.
++ * @crop: flag of crop supporting.
++ * @scale: flag of scale supporting.
++ * @blending: flag of blending supporting.
++ * @dithering: flag of dithering supporting.
++ * @colorfill: flag of colorfill supporting.
++ * @refresh_min: min hz of refresh.
++ * @refresh_max: max hz of refresh.
++ * @crop_min: crop min resolution.
++ * @crop_max: crop max resolution.
++ * @scale_min: scale min resolution.
++ * @scale_max: scale max resolution.
++ */
++struct drm_exynos_ipp_prop_list {
++	__u32	version;
++	__u32	ipp_id;
++	__u32	count;
++	__u32	writeback;
++	__u32	flip;
++	__u32	degree;
++	__u32	csc;
++	__u32	crop;
++	__u32	scale;
++	__u32	blending;
++	__u32	dithering;
++	__u32	colorfill;
++	__u32	refresh_min;
++	__u32	refresh_max;
++	struct drm_exynos_sz	crop_min;
++	struct drm_exynos_sz	crop_max;
++	struct drm_exynos_sz	scale_min;
++	struct drm_exynos_sz	scale_max;
++};
++
++/**
++ * A structure for ipp config.
++ *
++ * @ops_id: property of operation directions.
++ * @flip: property of mirror, flip.
++ * @degree: property of rotation degree.
++ * @fmt: property of image format.
++ * @sz: property of image size.
++ * @pos: property of image position(src-cropped,dst-scaler).
++ */
++struct drm_exynos_ipp_config {
++	enum drm_exynos_ops_id ops_id;
++	enum drm_exynos_flip	flip;
++	enum drm_exynos_degree	degree;
++	__u32	fmt;
++	struct drm_exynos_sz	sz;
++	struct drm_exynos_pos	pos;
++};
++
++/* definition of command */
++enum drm_exynos_ipp_cmd {
++	IPP_CMD_NONE,
++	IPP_CMD_M2M,
++	IPP_CMD_WB,
++	IPP_CMD_OUTPUT,
++	IPP_CMD_MAX,
++};
++
++/* define of color range */
++enum drm_exynos_color_range {
++	COLOR_RANGE_LIMITED,	/* Narrow: Y(16 to 235), Cb/Cr(16 to 240) */
++	COLOR_RANGE_FULL,	/* Wide: Y/Cb/Cr(0 to 255), Wide default */
++};
++
++/**
++ * A structure for ipp property.
++ *
++ * @config: source, destination config.
++ * @cmd: definition of command.
++ * @ipp_id: id of ipp driver.
++ * @prop_id: id of property.
++ * @refresh_rate: refresh rate.
++ * @range: dynamic range for csc.
++ * @blending: blending opeation config.
++ * @dithering: dithering opeation config.
++ * @color_fill: color fill value.
++ */
++struct drm_exynos_ipp_property {
++	struct drm_exynos_ipp_config config[EXYNOS_DRM_OPS_MAX];
++	enum drm_exynos_ipp_cmd	cmd;
++	__u32	ipp_id;
++	__u32	prop_id;
++	__u32	refresh_rate;
++	__u32	range;
++	__u32	blending;
++	__u32	dithering;
++	__u32	color_fill;
++};
++
++/* definition of buffer */
++enum drm_exynos_ipp_buf_type {
++	IPP_BUF_ENQUEUE,
++	IPP_BUF_DEQUEUE,
++};
++
++/**
++ * A structure for ipp buffer operations.
++ *
++ * @ops_id: operation directions.
++ * @buf_type: definition of buffer.
++ * @prop_id: id of property.
++ * @buf_id: id of buffer.
++ * @handle: Y, Cb, Cr each planar handle.
++ * @user_data: user data.
++ */
++struct drm_exynos_ipp_queue_buf {
++	enum drm_exynos_ops_id	ops_id;
++	enum drm_exynos_ipp_buf_type	buf_type;
++	__u32	prop_id;
++	__u32	buf_id;
++	__u32	handle[EXYNOS_DRM_PLANAR_MAX];
++	__u32	reserved;
++	__u64	user_data;
++};
++
++/* definition of control */
++enum drm_exynos_ipp_ctrl {
++	IPP_CTRL_PLAY,
++	IPP_CTRL_STOP,
++	IPP_CTRL_PAUSE,
++	IPP_CTRL_RESUME,
++	IPP_CTRL_MAX,
++};
++
++/**
++ * A structure for ipp start/stop operations.
++ *
++ * @prop_id: id of property.
++ * @ctrl: definition of control.
++ */
++struct drm_exynos_ipp_cmd_ctrl {
++	__u32	prop_id;
++	enum drm_exynos_ipp_ctrl	ctrl;
++};
++
+ #define DRM_EXYNOS_GEM_CREATE		0x00
++#define DRM_EXYNOS_GEM_MAP_OFFSET	0x01
++#define DRM_EXYNOS_GEM_MMAP		0x02
+ /* Reserved 0x04 ~ 0x05 for exynos specific gem ioctl */
+ #define DRM_EXYNOS_GEM_GET		0x04
+ #define DRM_EXYNOS_VIDI_CONNECTION	0x07
+@@ -141,6 +388,12 @@ struct drm_exynos_g2d_exec {
+ #define DRM_EXYNOS_G2D_SET_CMDLIST	0x21
+ #define DRM_EXYNOS_G2D_EXEC		0x22
+ 
++/* IPP - Image Post Processing */
++#define DRM_EXYNOS_IPP_GET_PROPERTY	0x30
++#define DRM_EXYNOS_IPP_SET_PROPERTY	0x31
++#define DRM_EXYNOS_IPP_QUEUE_BUF	0x32
++#define DRM_EXYNOS_IPP_CMD_CTRL	0x33
++
+ #define DRM_IOCTL_EXYNOS_GEM_CREATE		DRM_IOWR(DRM_COMMAND_BASE + \
+ 		DRM_EXYNOS_GEM_CREATE, struct drm_exynos_gem_create)
+ 
+@@ -157,4 +410,36 @@ struct drm_exynos_g2d_exec {
+ #define DRM_IOCTL_EXYNOS_G2D_EXEC		DRM_IOWR(DRM_COMMAND_BASE + \
+ 		DRM_EXYNOS_G2D_EXEC, struct drm_exynos_g2d_exec)
+ 
++#define DRM_IOCTL_EXYNOS_IPP_GET_PROPERTY	DRM_IOWR(DRM_COMMAND_BASE + \
++		DRM_EXYNOS_IPP_GET_PROPERTY, struct drm_exynos_ipp_prop_list)
++#define DRM_IOCTL_EXYNOS_IPP_SET_PROPERTY	DRM_IOWR(DRM_COMMAND_BASE + \
++		DRM_EXYNOS_IPP_SET_PROPERTY, struct drm_exynos_ipp_property)
++#define DRM_IOCTL_EXYNOS_IPP_QUEUE_BUF	DRM_IOWR(DRM_COMMAND_BASE + \
++		DRM_EXYNOS_IPP_QUEUE_BUF, struct drm_exynos_ipp_queue_buf)
++#define DRM_IOCTL_EXYNOS_IPP_CMD_CTRL		DRM_IOWR(DRM_COMMAND_BASE + \
++		DRM_EXYNOS_IPP_CMD_CTRL, struct drm_exynos_ipp_cmd_ctrl)
++
++/* EXYNOS specific events */
++#define DRM_EXYNOS_G2D_EVENT		0x80000000
++#define DRM_EXYNOS_IPP_EVENT		0x80000001
++
++struct drm_exynos_g2d_event {
++	struct drm_event	base;
++	__u64			user_data;
++	__u32			tv_sec;
++	__u32			tv_usec;
++	__u32			cmdlist_no;
++	__u32			reserved;
++};
++
++struct drm_exynos_ipp_event {
++	struct drm_event	base;
++	__u64			user_data;
++	__u32			tv_sec;
++	__u32			tv_usec;
++	__u32			prop_id;
++	__u32			reserved;
++	__u32			buf_id[EXYNOS_DRM_OPS_MAX];
++};
++
+ #endif
+diff --git a/include/drm/Makefile.am b/include/drm/Makefile.am
+new file mode 100644
+index 0000000..5f9695f
+--- /dev/null
++++ b/include/drm/Makefile.am
+@@ -0,0 +1,45 @@
++#  Copyright 2005 Adam Jackson.
++#
++#  Permission is hereby granted, free of charge, to any person obtaining a
++#  copy of this software and associated documentation files (the "Software"),
++#  to deal in the Software without restriction, including without limitation
++#  on the rights to use, copy, modify, merge, publish, distribute, sub
++#  license, and/or sell copies of the Software, and to permit persons to whom
++#  the Software is furnished to do so, subject to the following conditions:
++#
++#  The above copyright notice and this permission notice (including the next
++#  paragraph) shall be included in all copies or substantial portions of the
++#  Software.
++#
++#  THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
++#  IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
++#  FITNESS FOR A PARTICULAR PURPOSE AND NON-INFRINGEMENT.  IN NO EVENT SHALL
++#  ADAM JACKSON BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER
++#  IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
++#  CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
++
++# XXX airlied says, nothing besides *_drm.h and drm*.h should be necessary.
++# however, r300 and via need their reg headers installed in order to build.
++# better solutions are welcome.
++
++klibdrmincludedir = ${includedir}/libdrm
++klibdrminclude_HEADERS = \
++	drm.h \
++	drm_mode.h \
++	drm_fourcc.h \
++	drm_sarea.h \
++	i915_drm.h \
++	mga_drm.h \
++	nouveau_drm.h \
++	r128_drm.h \
++	radeon_drm.h \
++	savage_drm.h \
++	sis_drm.h \
++	via_drm.h \
++	mach64_drm.h \
++	qxl_drm.h \
++	vigs_drm.h
++
++if HAVE_VMWGFX
++klibdrminclude_HEADERS += vmwgfx_drm.h
++endif
+diff --git a/include/drm/vigs_drm.h b/include/drm/vigs_drm.h
+new file mode 100644
+index 0000000..24f2a43
+--- /dev/null
++++ b/include/drm/vigs_drm.h
+@@ -0,0 +1,242 @@
++/*
++ * vigs_drm.h
++ */
++
++/*
++ * Copyright (c) 2013 Samsung Electronics Co., Ltd.
++ * Authors:
++ * Stanislav Vorobiov <s.vorobiov@samsung.com>
++ *
++ * Permission is hereby granted, free of charge, to any person obtaining a
++ * copy of this software and associated documentation files (the "Software"),
++ * to deal in the Software without restriction, including without limitation
++ * the rights to use, copy, modify, merge, publish, distribute, sublicense,
++ * and/or sell copies of the Software, and to permit persons to whom the
++ * Software is furnished to do so, subject to the following conditions:
++ *
++ * The above copyright notice and this permission notice (including the next
++ * paragraph) shall be included in all copies or substantial portions of the
++ * Software.
++ *
++ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
++ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
++ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.  IN NO EVENT SHALL
++ * VA LINUX SYSTEMS AND/OR ITS SUPPLIERS BE LIABLE FOR ANY CLAIM, DAMAGES OR
++ * OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE,
++ * ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
++ * OTHER DEALINGS IN THE SOFTWARE.
++ */
++
++#ifndef _VIGS_DRM_H_
++#define _VIGS_DRM_H_
++
++/*
++ * Bump this whenever driver interface changes.
++ */
++#define DRM_VIGS_DRIVER_VERSION 14
++
++/*
++ * Surface access flags.
++ */
++#define DRM_VIGS_SAF_READ 1
++#define DRM_VIGS_SAF_WRITE 2
++#define DRM_VIGS_SAF_MASK 3
++
++/*
++ * Number of DP framebuffers.
++ */
++#define DRM_VIGS_NUM_DP_FB_BUF 4
++
++/*
++ * DP memory types.
++ */
++#define DRM_VIGS_DP_FB_Y 2
++#define DRM_VIGS_DP_FB_C 3
++
++struct drm_vigs_get_protocol_version
++{
++    uint32_t version;
++};
++
++struct drm_vigs_create_surface
++{
++    uint32_t width;
++    uint32_t height;
++    uint32_t stride;
++    uint32_t format;
++    int scanout;
++    uint32_t handle;
++    uint32_t size;
++    uint32_t id;
++};
++
++struct drm_vigs_create_execbuffer
++{
++    uint32_t size;
++    uint32_t handle;
++};
++
++struct drm_vigs_gem_map
++{
++    uint32_t handle;
++    int track_access;
++    unsigned long address;
++};
++
++struct drm_vigs_gem_wait
++{
++    uint32_t handle;
++};
++
++struct drm_vigs_surface_info
++{
++    uint32_t handle;
++    uint32_t width;
++    uint32_t height;
++    uint32_t stride;
++    uint32_t format;
++    int scanout;
++    uint32_t size;
++    uint32_t id;
++};
++
++struct drm_vigs_exec
++{
++    uint32_t handle;
++};
++
++struct drm_vigs_surface_set_gpu_dirty
++{
++    uint32_t handle;
++};
++
++struct drm_vigs_surface_start_access
++{
++    unsigned long address;
++    uint32_t saf;
++};
++
++struct drm_vigs_surface_end_access
++{
++    unsigned long address;
++    int sync;
++};
++
++struct drm_vigs_create_fence
++{
++    int send;
++    uint32_t handle;
++    uint32_t seq;
++};
++
++struct drm_vigs_fence_wait
++{
++    uint32_t handle;
++};
++
++struct drm_vigs_fence_signaled
++{
++    uint32_t handle;
++    int signaled;
++};
++
++struct drm_vigs_fence_unref
++{
++    uint32_t handle;
++};
++
++struct drm_vigs_plane_set_zpos
++{
++    uint32_t plane_id;
++    int zpos;
++};
++
++struct drm_vigs_plane_set_transform
++{
++    uint32_t plane_id;
++    int hflip;
++    int vflip;
++    int rotation;
++};
++
++struct drm_vigs_dp_create_surface
++{
++    uint32_t dp_plane;
++    uint32_t dp_fb_buf;
++    uint32_t dp_mem_flag;
++    uint32_t width;
++    uint32_t height;
++    uint32_t stride;
++    uint32_t format;
++    uint32_t handle;
++    uint32_t size;
++    uint32_t id;
++};
++
++struct drm_vigs_dp_open_surface
++{
++    uint32_t dp_plane;
++    uint32_t dp_fb_buf;
++    uint32_t dp_mem_flag;
++    uint32_t handle;
++};
++
++#define DRM_VIGS_GET_PROTOCOL_VERSION 0x00
++#define DRM_VIGS_CREATE_SURFACE 0x01
++#define DRM_VIGS_CREATE_EXECBUFFER 0x02
++#define DRM_VIGS_GEM_MAP 0x03
++#define DRM_VIGS_GEM_WAIT 0x04
++#define DRM_VIGS_SURFACE_INFO 0x05
++#define DRM_VIGS_EXEC 0x06
++#define DRM_VIGS_SURFACE_SET_GPU_DIRTY 0x07
++#define DRM_VIGS_SURFACE_START_ACCESS 0x08
++#define DRM_VIGS_SURFACE_END_ACCESS 0x09
++#define DRM_VIGS_CREATE_FENCE 0x0A
++#define DRM_VIGS_FENCE_WAIT 0x0B
++#define DRM_VIGS_FENCE_SIGNALED 0x0C
++#define DRM_VIGS_FENCE_UNREF 0x0D
++#define DRM_VIGS_PLANE_SET_ZPOS 0x0E
++#define DRM_VIGS_PLANE_SET_TRANSFORM 0x0F
++
++#define DRM_VIGS_DP_CREATE_SURFACE 0x20
++#define DRM_VIGS_DP_OPEN_SURFACE 0x21
++
++#define DRM_IOCTL_VIGS_GET_PROTOCOL_VERSION DRM_IOR(DRM_COMMAND_BASE + \
++            DRM_VIGS_GET_PROTOCOL_VERSION, struct drm_vigs_get_protocol_version)
++#define DRM_IOCTL_VIGS_CREATE_SURFACE DRM_IOWR(DRM_COMMAND_BASE + \
++            DRM_VIGS_CREATE_SURFACE, struct drm_vigs_create_surface)
++#define DRM_IOCTL_VIGS_CREATE_EXECBUFFER DRM_IOWR(DRM_COMMAND_BASE + \
++            DRM_VIGS_CREATE_EXECBUFFER, struct drm_vigs_create_execbuffer)
++#define DRM_IOCTL_VIGS_GEM_MAP DRM_IOWR(DRM_COMMAND_BASE + \
++            DRM_VIGS_GEM_MAP, struct drm_vigs_gem_map)
++#define DRM_IOCTL_VIGS_GEM_WAIT DRM_IOW(DRM_COMMAND_BASE + \
++            DRM_VIGS_GEM_WAIT, struct drm_vigs_gem_wait)
++#define DRM_IOCTL_VIGS_SURFACE_INFO DRM_IOWR(DRM_COMMAND_BASE + \
++            DRM_VIGS_SURFACE_INFO, struct drm_vigs_surface_info)
++#define DRM_IOCTL_VIGS_EXEC DRM_IOW(DRM_COMMAND_BASE + \
++            DRM_VIGS_EXEC, struct drm_vigs_exec)
++#define DRM_IOCTL_VIGS_SURFACE_SET_GPU_DIRTY DRM_IOW(DRM_COMMAND_BASE + \
++            DRM_VIGS_SURFACE_SET_GPU_DIRTY, struct drm_vigs_surface_set_gpu_dirty)
++#define DRM_IOCTL_VIGS_SURFACE_START_ACCESS DRM_IOW(DRM_COMMAND_BASE + \
++            DRM_VIGS_SURFACE_START_ACCESS, struct drm_vigs_surface_start_access)
++#define DRM_IOCTL_VIGS_SURFACE_END_ACCESS DRM_IOW(DRM_COMMAND_BASE + \
++            DRM_VIGS_SURFACE_END_ACCESS, struct drm_vigs_surface_end_access)
++#define DRM_IOCTL_VIGS_CREATE_FENCE DRM_IOWR(DRM_COMMAND_BASE + \
++            DRM_VIGS_CREATE_FENCE, struct drm_vigs_create_fence)
++#define DRM_IOCTL_VIGS_FENCE_WAIT DRM_IOW(DRM_COMMAND_BASE + \
++            DRM_VIGS_FENCE_WAIT, struct drm_vigs_fence_wait)
++#define DRM_IOCTL_VIGS_FENCE_SIGNALED DRM_IOWR(DRM_COMMAND_BASE + \
++            DRM_VIGS_FENCE_SIGNALED, struct drm_vigs_fence_signaled)
++#define DRM_IOCTL_VIGS_FENCE_UNREF DRM_IOW(DRM_COMMAND_BASE + \
++            DRM_VIGS_FENCE_UNREF, struct drm_vigs_fence_unref)
++#define DRM_IOCTL_VIGS_PLANE_SET_ZPOS DRM_IOW(DRM_COMMAND_BASE + \
++            DRM_VIGS_PLANE_SET_ZPOS, struct drm_vigs_plane_set_zpos)
++#define DRM_IOCTL_VIGS_PLANE_SET_TRANSFORM DRM_IOW(DRM_COMMAND_BASE + \
++            DRM_VIGS_PLANE_SET_TRANSFORM, struct drm_vigs_plane_set_transform)
++
++#define DRM_IOCTL_VIGS_DP_CREATE_SURFACE DRM_IOWR(DRM_COMMAND_BASE + \
++            DRM_VIGS_DP_CREATE_SURFACE, struct drm_vigs_dp_create_surface)
++#define DRM_IOCTL_VIGS_DP_OPEN_SURFACE DRM_IOWR(DRM_COMMAND_BASE + \
++            DRM_VIGS_DP_OPEN_SURFACE, struct drm_vigs_dp_open_surface)
++
++#endif
+diff --git a/tests/Makefile.am b/tests/Makefile.am
+index 069285f..16a94ff 100644
+--- a/tests/Makefile.am
++++ b/tests/Makefile.am
+@@ -10,6 +10,8 @@ endif
+ 
+ if HAVE_EXYNOS
+ SUBDIRS += exynos
++SUBDIRS += ipptest
++SUBDIRS += rottest
+ endif
+ 
+ if HAVE_TEGRA
+diff --git a/tests/ipptest/Makefile.am b/tests/ipptest/Makefile.am
+new file mode 100644
+index 0000000..7b10df9
+--- /dev/null
++++ b/tests/ipptest/Makefile.am
+@@ -0,0 +1,24 @@
++AM_CFLAGS = \
++	-I$(top_srcdir)/include/drm \
++	-I$(top_srcdir)/libkms/ \
++	-I$(top_srcdir)/exynos/ \
++	-I$(top_srcdir)
++
++if HAVE_INSTALL_TESTS
++bin_PROGRAMS = \
++	ipptest
++else
++noinst_PROGRAMS = \
++	ipptest
++endif
++
++ipptest_SOURCES = \
++	fimctest.c \
++	gem.c \
++	util.c \
++	fimc.c
++
++ipptest_LDADD = \
++	$(top_builddir)/libdrm.la \
++	$(top_builddir)/libkms/libkms.la \
++	$(top_builddir)/exynos/libdrm_exynos.la
+diff --git a/tests/ipptest/fimc.c b/tests/ipptest/fimc.c
+new file mode 100644
+index 0000000..cf8fbb0
+--- /dev/null
++++ b/tests/ipptest/fimc.c
+@@ -0,0 +1,595 @@
++/*
++ * DRM based fimc test program
++ * Copyright 2012 Samsung Electronics
++ *   Eunchul Kim <chulspro.kim@sasmsung.com>
++ *
++ * Permission is hereby granted, free of charge, to any person obtaining a
++ * copy of this software and associated documentation files (the "Software"),
++ * to deal in the Software without restriction, including without limitation
++ * the rights to use, copy, modify, merge, publish, distribute, sublicense,
++ * and/or sell copies of the Software, and to permit persons to whom the
++ * Software is furnished to do so, subject to the following conditions:
++ *
++ * The above copyright notice and this permission notice shall be included in
++ * all copies or substantial portions of the Software.
++ *
++ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
++ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
++ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
++ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
++ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
++ * FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
++ * IN THE SOFTWARE.
++ */
++
++#include <stdio.h>
++#include <stdlib.h>
++#include <stdint.h>
++#include <unistd.h>
++#include <string.h>
++#include <errno.h>
++#include <sys/time.h>
++#include <sys/mman.h>
++
++#include "exynos_drm.h"
++#include "fimctest.h"
++#include "gem.h"
++#include "util.h"
++
++#include "drm_fourcc.h"
++
++static int exynos_drm_ipp_set_property(int fd,
++				struct drm_exynos_ipp_property *property,
++				struct drm_exynos_sz *def_sz,
++				enum drm_exynos_ipp_cmd cmd,
++				enum drm_exynos_degree degree)
++{
++	struct drm_exynos_pos crop_pos = {0, 0, def_sz->hsize, def_sz->vsize};
++	struct drm_exynos_pos scale_pos = {0, 0, def_sz->hsize, def_sz->vsize};
++	struct drm_exynos_sz src_sz = {def_sz->hsize, def_sz->vsize};
++	struct drm_exynos_sz dst_sz = {def_sz->hsize, def_sz->vsize};
++	int ret = 0;
++
++	memset(property, 0x00, sizeof(struct drm_exynos_ipp_property));
++	property->cmd = cmd;
++
++	switch(cmd) {
++	case IPP_CMD_M2M:
++		property->config[EXYNOS_DRM_OPS_SRC].ops_id = EXYNOS_DRM_OPS_SRC;
++		property->config[EXYNOS_DRM_OPS_SRC].flip = EXYNOS_DRM_FLIP_NONE;
++		property->config[EXYNOS_DRM_OPS_SRC].degree = EXYNOS_DRM_DEGREE_0;
++		property->config[EXYNOS_DRM_OPS_SRC].fmt = DRM_FORMAT_XRGB8888;
++		property->config[EXYNOS_DRM_OPS_SRC].pos = crop_pos;
++		property->config[EXYNOS_DRM_OPS_SRC].sz = src_sz;
++
++		property->config[EXYNOS_DRM_OPS_DST].ops_id = EXYNOS_DRM_OPS_DST;
++		property->config[EXYNOS_DRM_OPS_DST].flip = EXYNOS_DRM_FLIP_NONE;
++		property->config[EXYNOS_DRM_OPS_DST].degree = degree;
++		property->config[EXYNOS_DRM_OPS_DST].fmt = DRM_FORMAT_XRGB8888;
++		if (property->config[EXYNOS_DRM_OPS_DST].degree == EXYNOS_DRM_DEGREE_90) {
++			dst_sz.hsize = def_sz->vsize;
++			dst_sz.vsize = def_sz->hsize;
++
++			scale_pos.w = def_sz->vsize;
++			scale_pos.h = def_sz->hsize;
++		}
++		property->config[EXYNOS_DRM_OPS_DST].pos = scale_pos;
++		property->config[EXYNOS_DRM_OPS_DST].sz = dst_sz;
++		property->range = COLOR_RANGE_FULL;	/* Wide default */
++		break;
++	case IPP_CMD_WB:
++		property->config[EXYNOS_DRM_OPS_SRC].ops_id = EXYNOS_DRM_OPS_SRC;
++		property->config[EXYNOS_DRM_OPS_SRC].flip = EXYNOS_DRM_FLIP_NONE;
++		property->config[EXYNOS_DRM_OPS_SRC].degree = EXYNOS_DRM_DEGREE_0;
++		property->config[EXYNOS_DRM_OPS_SRC].fmt = DRM_FORMAT_YUV444;
++		if (property->config[EXYNOS_DRM_OPS_SRC].degree == EXYNOS_DRM_DEGREE_90) {
++			src_sz.hsize = def_sz->vsize;
++			src_sz.vsize = def_sz->hsize;
++
++			crop_pos.w = def_sz->vsize;
++			crop_pos.h = def_sz->hsize;
++		}
++		property->config[EXYNOS_DRM_OPS_SRC].pos = crop_pos;
++		property->config[EXYNOS_DRM_OPS_SRC].sz = src_sz;
++
++		property->config[EXYNOS_DRM_OPS_DST].ops_id = EXYNOS_DRM_OPS_DST;
++		property->config[EXYNOS_DRM_OPS_DST].flip = EXYNOS_DRM_FLIP_NONE;
++		property->config[EXYNOS_DRM_OPS_DST].degree = degree;
++		property->config[EXYNOS_DRM_OPS_DST].fmt = DRM_FORMAT_XRGB8888;
++		if (property->config[EXYNOS_DRM_OPS_DST].degree == EXYNOS_DRM_DEGREE_90) {
++			dst_sz.hsize = def_sz->vsize;
++			dst_sz.vsize = def_sz->hsize;
++
++			scale_pos.w = def_sz->vsize;
++			scale_pos.h = def_sz->hsize;
++		}
++		property->config[EXYNOS_DRM_OPS_DST].pos = scale_pos;
++		property->config[EXYNOS_DRM_OPS_DST].sz = dst_sz;
++		property->range = COLOR_RANGE_FULL;	/* Wide default */
++		break;
++	case IPP_CMD_OUTPUT:
++	default:
++		ret = -EINVAL;
++		return ret;
++	}
++
++	ret = ioctl(fd, DRM_IOCTL_EXYNOS_IPP_SET_PROPERTY, property);
++	if (ret)
++		fprintf(stderr,
++			"failed to DRM_IOCTL_EXYNOS_IPP_SET_PROPERTY : %s\n",
++			strerror(errno));
++	
++	printf("DRM_IOCTL_EXYNOS_IPP_SET_PROPERTY : prop_id[%d]\n",
++		property->prop_id);
++
++	return ret;
++}
++
++static int exynos_drm_ipp_queue_buf(int fd, struct drm_exynos_ipp_queue_buf *qbuf,
++					enum drm_exynos_ops_id ops_id,
++					enum drm_exynos_ipp_buf_type buf_type,
++					int prop_id,
++					int buf_id,
++					unsigned int gem_handle)
++{
++	int ret = 0;
++
++	memset(qbuf, 0x00, sizeof(struct drm_exynos_ipp_queue_buf));
++
++	qbuf->ops_id = ops_id;
++	qbuf->buf_type = buf_type;
++	qbuf->user_data = 0;
++	qbuf->prop_id = prop_id;
++	qbuf->buf_id = buf_id;
++	qbuf->handle[EXYNOS_DRM_PLANAR_Y] = gem_handle;
++	qbuf->handle[EXYNOS_DRM_PLANAR_CB] = 0;
++	qbuf->handle[EXYNOS_DRM_PLANAR_CR] = 0;
++
++	ret = ioctl(fd, DRM_IOCTL_EXYNOS_IPP_QUEUE_BUF, qbuf);
++	if (ret)
++		fprintf(stderr,
++		"failed to DRM_IOCTL_EXYNOS_IPP_QUEUE_BUF[id:%d][buf_type:%d] : %s\n",
++		ops_id, buf_type, strerror(errno));
++ 
++	return ret;
++}
++
++static int exynos_drm_ipp_cmd_ctrl(int fd, struct drm_exynos_ipp_cmd_ctrl *cmd_ctrl,
++				int prop_id,
++				enum drm_exynos_ipp_ctrl ctrl)
++{
++	int ret = 0;
++
++	memset(cmd_ctrl, 0x00, sizeof(struct drm_exynos_ipp_cmd_ctrl));
++
++	cmd_ctrl->prop_id = prop_id;
++	cmd_ctrl->ctrl = ctrl;
++
++	ret = ioctl(fd, DRM_IOCTL_EXYNOS_IPP_CMD_CTRL, cmd_ctrl);
++	if (ret)
++		fprintf(stderr,
++		"failed to DRM_IOCTL_EXYNOS_IPP_CMD_CTRL[prop_id:%d][ctrl:%d] : %s\n",
++		prop_id, ctrl, strerror(errno));
++
++	return ret;
++}
++
++int fimc_event_handler(struct drm_exynos_ipp_queue_buf *src_qbuf, struct drm_exynos_gem_create *src_gem,
++	struct drm_exynos_ipp_queue_buf *dst_qbuf, struct drm_exynos_gem_create *dst_gem,
++	struct drm_exynos_ipp_property *property, void **usr_addr,
++	unsigned int width, unsigned int height, enum drm_exynos_ipp_cmd cmd)
++{
++	char buffer[1024];
++	int len, i;
++	struct drm_event *e;
++	struct drm_exynos_ipp_event *ipp_event;
++	char filename[100];
++	int ret = 0;
++	int src_buf_id, dst_buf_id;
++	static bmp_idx = 0;
++
++	len = read(fd, buffer, sizeof buffer);
++	if (len == 0)
++		return 0;
++	if (len < sizeof *e)
++		return -1;
++
++	i = 0;
++	while (i < len) {
++		e = (struct drm_event *) &buffer[i];
++		switch (e->type) {
++		case DRM_EXYNOS_IPP_EVENT:
++			ipp_event = (struct drm_exynos_ipp_event *) e;
++			src_buf_id = ipp_event->buf_id[EXYNOS_DRM_OPS_SRC];
++			dst_buf_id = ipp_event->buf_id[EXYNOS_DRM_OPS_DST];
++
++			printf("%s:src_buf_id[%d]dst_buf_id[%d]bmp_idx[%d]\n", __func__, src_buf_id, dst_buf_id, bmp_idx++);
++			if (cmd == IPP_CMD_M2M) {
++				sprintf(filename, "/opt/media/fimc_m2m_dst%d.bmp", bmp_idx);
++
++				util_write_bmp(filename, usr_addr[dst_buf_id], width, height);
++
++				/* For source buffer queue to IPP */
++				ret = exynos_drm_ipp_queue_buf(fd, &src_qbuf[src_buf_id], EXYNOS_DRM_OPS_SRC,
++							IPP_BUF_ENQUEUE, property->prop_id,
++							src_buf_id, src_gem[src_buf_id].handle);
++				if (ret) {
++					fprintf(stderr, "failed to ipp buf src queue\n");
++					goto err_ipp_ctrl_close;
++				}
++
++				/* For destination buffer queue to IPP */
++				ret = exynos_drm_ipp_queue_buf(fd, &dst_qbuf[dst_buf_id], EXYNOS_DRM_OPS_DST,
++							IPP_BUF_ENQUEUE, property->prop_id,
++							dst_buf_id, dst_gem[dst_buf_id].handle);
++				if (ret) {
++					fprintf(stderr, "failed to ipp buf dst queue\n");
++					goto err_ipp_ctrl_close;
++				}
++			} else if (cmd == IPP_CMD_WB) {
++				sprintf(filename, "/opt/media/fimc_wb_%d.bmp", bmp_idx);
++
++				util_write_bmp(filename, usr_addr[dst_buf_id], width, height);
++			
++				/* For destination buffer queue to IPP */
++				ret = exynos_drm_ipp_queue_buf(fd, &dst_qbuf[dst_buf_id], EXYNOS_DRM_OPS_DST,
++							IPP_BUF_ENQUEUE, property->prop_id,
++							dst_buf_id, dst_gem[dst_buf_id].handle);
++				if (ret) {
++					fprintf(stderr, "failed to ipp buf dst queue\n");
++					goto err_ipp_ctrl_close;
++				}
++			}
++			break;
++		default:
++			break;
++		}
++		i += e->length;
++	}
++
++err_ipp_ctrl_close:
++	return ret;
++}
++
++void fimc_m2m_set_mode(struct connector *c, int count, int page_flip,
++								long int *usec)
++{
++	struct drm_exynos_ipp_property property;
++	struct drm_exynos_ipp_cmd_ctrl cmd_ctrl;
++	struct drm_exynos_sz def_sz = {720, 1280};
++	struct drm_exynos_ipp_queue_buf qbuf1[MAX_BUF], qbuf2[MAX_BUF];
++	unsigned int width=720, height=1280, stride;
++	int ret, i, j, x;
++	struct drm_exynos_gem_create gem1[MAX_BUF], gem2[MAX_BUF];
++	struct drm_exynos_gem_mmap mmap1[MAX_BUF], mmap2[MAX_BUF];
++	void *usr_addr1[MAX_BUF], *usr_addr2[MAX_BUF];
++	struct timeval begin, end;
++	struct drm_gem_close args;
++	char filename[100];
++
++	/* For mode */
++	width = height = 0;
++	for (i = 0; i < count; i++) {
++		connector_find_mode(&c[i]);
++		if (c[i].mode == NULL) continue;
++		width += c[i].mode->hdisplay;
++		if (height < c[i].mode->vdisplay) height = c[i].mode->vdisplay;
++	}
++	stride = width * 4;    
++	i =0;
++
++	def_sz.hsize = width;
++	def_sz.vsize = height;
++
++	/* For property */
++	ret = exynos_drm_ipp_set_property(fd, &property, &def_sz, IPP_CMD_M2M, EXYNOS_DRM_DEGREE_90);
++	if (ret) {
++		fprintf(stderr, "failed to ipp property\n");
++		return;
++	}
++
++	for (i = 0; i < MAX_BUF; i++) {
++		/* For source buffer */
++		ret = util_gem_create_mmap(fd, &gem1[i], &mmap1[i], stride * height);
++		if (ret) {
++			fprintf(stderr, "failed to gem create mmap: %s\n",
++			strerror(errno));
++
++			if (ret == -1)
++				return;
++			else if (ret == -2)
++				goto err_ipp_ctrl_close;
++		}
++		usr_addr1[i] = (void *)(unsigned long)mmap1[i].mapped;
++
++		/* For source buffer map to IPP */
++		ret = exynos_drm_ipp_queue_buf(fd, &qbuf1[i], EXYNOS_DRM_OPS_SRC,
++				IPP_BUF_ENQUEUE, property.prop_id, i, gem1[i].handle);
++		if (ret) {
++			fprintf(stderr, "failed to ipp buf src map\n");
++			goto err_ipp_ctrl_close;
++		}
++
++		util_draw_buffer(usr_addr1[i], 1, width, height, stride, 0);
++		sprintf(filename, "/opt/media/fimc_m2m_org_src%d.bmp", j);
++		util_write_bmp(filename, usr_addr1[i], width, height);
++	}
++
++	for (i = 0; i < MAX_BUF; i++) {
++		/* For destination buffer */
++		ret = util_gem_create_mmap(fd, &gem2[i], &mmap2[i], stride * height);
++		if (ret) {
++			fprintf(stderr, "failed to gem create mmap: %s\n",
++						strerror(errno));
++			if (ret == -1)
++				goto err_ipp_ctrl_close;
++			else if (ret == -2)
++				goto err_ipp_ctrl_close;
++		}
++		usr_addr2[i] = (void*)(unsigned long)mmap2[i].mapped;
++
++		/* For destination buffer map to IPP */
++		ret = exynos_drm_ipp_queue_buf(fd, &qbuf2[i], EXYNOS_DRM_OPS_DST,
++			IPP_BUF_ENQUEUE, property.prop_id, i, gem2[i].handle);
++		if (ret) {
++			fprintf(stderr, "failed to ipp buf dst map\n");
++			goto err_ipp_ctrl_close;
++		}
++
++		util_draw_buffer(usr_addr2[i], 0, 0, 0, 0, mmap2[i].size);
++		sprintf(filename, "/opt/media/fimc_m2m_org_dst%d.bmp", j);
++		util_write_bmp(filename, usr_addr2[i], height, width);
++	}
++
++	/* Start */
++	gettimeofday(&begin, NULL);
++	ret = exynos_drm_ipp_cmd_ctrl(fd, &cmd_ctrl, property.prop_id, IPP_CTRL_PLAY);
++	if (ret) {
++		fprintf(stderr,
++		"failed to ipp ctrl IPP_CMD_M2M start\n");
++		goto err_ipp_ctrl_close;
++	}
++        
++	j=0;
++	while (1) {
++		struct timeval timeout = { .tv_sec = 3, .tv_usec = 0 };
++		fd_set fds;
++
++		FD_ZERO(&fds);
++		FD_SET(0, &fds);
++		FD_SET(fd, &fds);
++		ret = select(fd + 1, &fds, NULL, NULL, &timeout);
++		if (ret <= 0) {
++			fprintf(stderr, "select timed out or error.\n");
++			continue;
++		} else if (FD_ISSET(0, &fds)) {
++			break;
++		}
++
++		gettimeofday(&end, NULL);
++		usec[j] = (end.tv_sec - begin.tv_sec) * 1000000 +
++		(end.tv_usec - begin.tv_usec);
++
++		if (property.config[EXYNOS_DRM_OPS_DST].degree == EXYNOS_DRM_DEGREE_90 ||
++			property.config[EXYNOS_DRM_OPS_DST].degree == EXYNOS_DRM_DEGREE_270) {
++			if(fimc_event_handler(qbuf1, gem1, qbuf2, gem2, &property, usr_addr2, height, width, IPP_CMD_M2M) < 0)
++				break;
++		} else {
++			if(fimc_event_handler(qbuf1, gem1, qbuf2, gem2, &property, usr_addr2, width, height, IPP_CMD_M2M) < 0)
++				break;
++		}
++
++		if (++j > MAX_LOOP)
++			break;
++
++		gettimeofday(&begin, NULL);
++	}
++
++err_ipp_ctrl_close:
++	/* For source buffer dequeue to IPP */
++	for (i = 0; i < MAX_BUF; i++) {
++		ret = exynos_drm_ipp_queue_buf(fd, &qbuf1[i], EXYNOS_DRM_OPS_SRC,
++						IPP_BUF_DEQUEUE, property.prop_id, i, gem1[i].handle);
++		if (ret < 0)
++			fprintf(stderr, "failed to ipp buf dst dequeue\n");
++	}
++
++	/* For destination buffer dequeue to IPP */
++	for (i = 0; i < MAX_BUF; i++) {
++		ret = exynos_drm_ipp_queue_buf(fd, &qbuf2[i], EXYNOS_DRM_OPS_DST,
++						IPP_BUF_DEQUEUE, property.prop_id, i, gem2[i].handle);
++		if (ret < 0)
++			fprintf(stderr, "failed to ipp buf dst dequeue\n");
++	}
++
++	/* Stop */
++	ret = exynos_drm_ipp_cmd_ctrl(fd, &cmd_ctrl, property.prop_id, IPP_CTRL_STOP);
++	if (ret)
++		fprintf(stderr, "failed to ipp ctrl IPP_CMD_WB stop\n");
++
++	/* Close source buffer */
++	for (i = 0; i < MAX_BUF; i++) {
++		munmap(usr_addr1[i], mmap1[i].size);
++		memset(&args, 0x00, sizeof(struct drm_gem_close));
++		args.handle = gem1[i].handle;
++		exynos_gem_close(fd, &args);
++	}
++
++	/* Close destination buffer */
++	for (i = 0; i < MAX_BUF; i++) {
++		munmap(usr_addr2[i], mmap2[i].size);
++		memset(&args, 0x00, sizeof(struct drm_gem_close));
++		args.handle = gem2[i].handle;
++		exynos_gem_close(fd, &args);
++	}
++
++	return;
++}
++
++void fimc_wb_set_mode(struct connector *c, int count, int page_flip,
++								long int *usec)
++{
++	struct drm_exynos_pos def_pos = {0, 0, 720, 1280};
++	struct drm_exynos_sz def_sz = {720, 1280};
++	struct drm_exynos_ipp_property property;
++	struct drm_exynos_gem_create gem[MAX_BUF];
++	struct drm_exynos_gem_mmap mmap[MAX_BUF];
++	struct drm_exynos_ipp_queue_buf qbuf[MAX_BUF];	
++	void *usr_addr[MAX_BUF];
++	struct drm_exynos_ipp_cmd_ctrl cmd_ctrl;
++	unsigned int width, height, stride;
++	int ret, i, j;
++	struct timeval begin, end;
++	struct drm_gem_close args;
++
++	/* For mode */
++	width = height = 0;
++	for (i = 0; i < count; i++) {
++		connector_find_mode(&c[i]);
++		if (c[i].mode == NULL) continue;
++		width += c[i].mode->hdisplay;
++		if (height < c[i].mode->vdisplay) height = c[i].mode->vdisplay;
++	}
++	stride = width * 4;
++
++	def_sz.hsize = width;
++	def_sz.vsize = height;
++
++	/* For property */
++	ret = exynos_drm_ipp_set_property(fd, &property, &def_sz, IPP_CMD_WB, EXYNOS_DRM_DEGREE_0);
++	if (ret) {
++		fprintf(stderr, "failed to ipp property\n");
++		return;
++	}
++
++	/* For destination buffer */
++	for (i = 0; i < MAX_BUF; i++) {
++		ret = util_gem_create_mmap(fd, &gem[i], &mmap[i], stride * height);
++		if (ret) {
++			fprintf(stderr, "failed to gem create mmap: %s\n",
++								strerror(errno));
++			if (ret == -1) return;
++			else if (ret == -2) goto err_ipp_ctrl_close;
++		}
++		usr_addr[i] = (void *)(unsigned long)mmap[i].mapped;
++		/* For destination buffer map to IPP */
++		ret = exynos_drm_ipp_queue_buf(fd, &qbuf[i], EXYNOS_DRM_OPS_DST,
++						IPP_BUF_ENQUEUE, property.prop_id, i, gem[i].handle);
++		if (ret) {
++			fprintf(stderr, "failed to ipp buf dst map\n");
++			goto err_ipp_ctrl_close;
++		}
++	}
++
++	/* Start */
++	gettimeofday(&begin, NULL);
++	ret = exynos_drm_ipp_cmd_ctrl(fd, &cmd_ctrl, property.prop_id, IPP_CTRL_PLAY);
++	if (ret) {
++		fprintf(stderr,
++			"failed to ipp ctrl IPP_CMD_WB start\n");
++		goto err_ipp_ctrl_close;
++	}
++
++	j = 0;
++	while (1) {
++		struct timeval timeout = { .tv_sec = 3, .tv_usec = 0 };
++		fd_set fds;
++
++		FD_ZERO(&fds);
++		FD_SET(0, &fds);
++		FD_SET(fd, &fds);
++		ret = select(fd + 1, &fds, NULL, NULL, &timeout);
++		if (ret <= 0) {
++			fprintf(stderr, "select timed out or error.\n");
++			continue;
++		} else if (FD_ISSET(0, &fds)) {
++			fprintf(stderr, "select error.\n");
++			break;
++		}
++
++		gettimeofday(&end, NULL);
++		usec[j] = (end.tv_sec - begin.tv_sec) * 1000000 +
++					(end.tv_usec - begin.tv_usec);
++
++		if (property.config[EXYNOS_DRM_OPS_DST].degree == EXYNOS_DRM_DEGREE_90 ||
++			property.config[EXYNOS_DRM_OPS_DST].degree == EXYNOS_DRM_DEGREE_270 ||
++			property.config[EXYNOS_DRM_OPS_SRC].degree == EXYNOS_DRM_DEGREE_90 ||
++			property.config[EXYNOS_DRM_OPS_SRC].degree == EXYNOS_DRM_DEGREE_270) {
++			if(fimc_event_handler(NULL, NULL, qbuf, gem, &property, usr_addr, height, width, IPP_CMD_WB) < 0)
++				break;
++		} else {
++			if(fimc_event_handler(NULL, NULL, qbuf, gem, &property, usr_addr, width, height, IPP_CMD_WB) < 0)
++				break;
++		}
++
++		if (++j > MAX_LOOP)
++			break;
++
++		if (j == HALF_LOOP) {
++			/* Stop */
++			ret = exynos_drm_ipp_cmd_ctrl(fd, &cmd_ctrl, property.prop_id, IPP_CTRL_STOP);
++			if (ret) {
++				fprintf(stderr, "failed to ipp ctrl IPP_CMD_WB stop\n");
++				goto err_ipp_ctrl_close;
++			}
++
++			/* For property */
++			ret = exynos_drm_ipp_set_property(fd, &property, &def_sz, IPP_CMD_WB, EXYNOS_DRM_DEGREE_90);
++			if (ret) {
++				fprintf(stderr, "failed to ipp property\n");
++				goto err_ipp_ctrl_close;
++			}
++
++			/* For destination buffer */
++			for (i = 0; i < MAX_BUF; i++) {
++				/* For destination buffer map to IPP */
++				ret = exynos_drm_ipp_queue_buf(fd, &qbuf[i], EXYNOS_DRM_OPS_DST,
++								IPP_BUF_ENQUEUE, property.prop_id, i, gem[i].handle);
++				if (ret) {
++					fprintf(stderr, "failed to ipp buf dst map\n");
++					goto err_ipp_ctrl_close;
++				}
++			}
++
++			/* Start */
++			ret = exynos_drm_ipp_cmd_ctrl(fd, &cmd_ctrl, property.prop_id, IPP_CTRL_PLAY);
++			if (ret) {
++				fprintf(stderr,
++					"failed to ipp ctrl IPP_CMD_WB start\n");
++				goto err_ipp_ctrl_close;
++			}
++		}
++
++		gettimeofday(&begin, NULL);
++	}
++
++err_ipp_ctrl_close:
++	/* For destination buffer dequeue to IPP */
++	for (i = 0; i < MAX_BUF; i++) {
++		ret = exynos_drm_ipp_queue_buf(fd, &qbuf[i], EXYNOS_DRM_OPS_DST,
++						IPP_BUF_DEQUEUE, property.prop_id, i, gem[i].handle);
++		if (ret < 0)
++			fprintf(stderr, "failed to ipp buf dst dequeue\n");
++	}
++
++	/* Stop */
++	ret = exynos_drm_ipp_cmd_ctrl(fd, &cmd_ctrl, property.prop_id, IPP_CTRL_STOP);
++	if (ret)
++		fprintf(stderr, "failed to ipp ctrl IPP_CMD_WB stop\n");
++
++	for (i = 0; i < MAX_BUF; i++) {
++		munmap(usr_addr[i], mmap[i].size);
++		memset(&args, 0x00, sizeof(struct drm_gem_close));
++		args.handle = gem[i].handle;
++		exynos_gem_close(fd, &args);
++	}
++
++	return;
++}
++
++void fimc_output_set_mode(struct connector *c, int count, int page_flip,
++								long int *usec)
++{
++	fprintf(stderr, "not supported. please wait v2\n");
++}
++
+diff --git a/tests/ipptest/fimc.h b/tests/ipptest/fimc.h
+new file mode 100644
+index 0000000..81e0e00
+--- /dev/null
++++ b/tests/ipptest/fimc.h
+@@ -0,0 +1,11 @@
++#ifndef __FIMC_H__
++#define __FIMC_H__
++
++void fimc_m2m_set_mode(struct connector *c, int count, int page_flip,
++								long int *usec);
++void fimc_wb_set_mode(struct connector *c, int count, int page_flip,
++								long int *usec);
++void fimc_output_set_mode(struct connector *c, int count, int page_flip,
++								long int *usec);
++
++#endif
+diff --git a/tests/ipptest/fimctest.c b/tests/ipptest/fimctest.c
+new file mode 100644
+index 0000000..f56e999
+--- /dev/null
++++ b/tests/ipptest/fimctest.c
+@@ -0,0 +1,477 @@
++/*
++ * DRM based fimc test program
++ * Copyright 2012 Samsung Electronics
++ *   Eunchul Kim <chulspro.kim@sasmsung.com>
++ *
++ * Permission is hereby granted, free of charge, to any person obtaining a
++ * copy of this software and associated documentation files (the "Software"),
++ * to deal in the Software without restriction, including without limitation
++ * the rights to use, copy, modify, merge, publish, distribute, sublicense,
++ * and/or sell copies of the Software, and to permit persons to whom the
++ * Software is furnished to do so, subject to the following conditions:
++ *
++ * The above copyright notice and this permission notice shall be included in
++ * all copies or substantial portions of the Software.
++ *
++ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
++ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
++ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
++ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
++ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
++ * FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
++ * IN THE SOFTWARE.
++ */
++
++/*
++ * This fairly simple test program dumps output in a similar format to the
++ * "xrandr" tool everyone knows & loves.  It's necessarily slightly different
++ * since the kernel separates outputs into encoder and connector structures,
++ * each with their own unique ID.  The program also allows test testing of the
++ * memory management and mode setting APIs by allowing the user to specify a
++ * connector and mode to use for mode setting.  If all works as expected, a
++ * blue background should be painted on the monitor attached to the specified
++ * connector after the selected mode is set.
++ *
++ */
++
++#include "config.h"
++
++#include <assert.h>
++#include <stdio.h>
++#include <stdlib.h>
++#include <stdint.h>
++#include <unistd.h>
++#include <string.h>
++#include <errno.h>
++#include <sys/poll.h>
++#include <sys/time.h>
++#include <sys/mman.h>
++
++#include "libkms.h"
++
++#include "exynos_drm.h"
++
++#include "fimctest.h"
++#include "fimc.h"
++
++drmModeRes *resources;
++int fd, modes;
++
++#define ARRAY_SIZE(arr) (sizeof(arr) / sizeof((arr)[0]))
++
++struct type_name {
++	int type;
++	char *name;
++};
++
++#define type_name_fn(res) \
++char * res##_str(int type) {			\
++	int i;						\
++	for (i = 0; i < ARRAY_SIZE(res##_names); i++) { \
++		if (res##_names[i].type == type)	\
++			return res##_names[i].name;	\
++	}						\
++	return "(invalid)";				\
++}
++
++struct type_name encoder_type_names[] = {
++	{ DRM_MODE_ENCODER_NONE, "none" },
++	{ DRM_MODE_ENCODER_DAC, "DAC" },
++	{ DRM_MODE_ENCODER_TMDS, "TMDS" },
++	{ DRM_MODE_ENCODER_LVDS, "LVDS" },
++	{ DRM_MODE_ENCODER_TVDAC, "TVDAC" },
++};
++
++type_name_fn(encoder_type)
++
++struct type_name connector_status_names[] = {
++	{ DRM_MODE_CONNECTED, "connected" },
++	{ DRM_MODE_DISCONNECTED, "disconnected" },
++	{ DRM_MODE_UNKNOWNCONNECTION, "unknown" },
++};
++
++type_name_fn(connector_status)
++
++struct type_name connector_type_names[] = {
++	{ DRM_MODE_CONNECTOR_Unknown, "unknown" },
++	{ DRM_MODE_CONNECTOR_VGA, "VGA" },
++	{ DRM_MODE_CONNECTOR_DVII, "DVI-I" },
++	{ DRM_MODE_CONNECTOR_DVID, "DVI-D" },
++	{ DRM_MODE_CONNECTOR_DVIA, "DVI-A" },
++	{ DRM_MODE_CONNECTOR_Composite, "composite" },
++	{ DRM_MODE_CONNECTOR_SVIDEO, "s-video" },
++	{ DRM_MODE_CONNECTOR_LVDS, "LVDS" },
++	{ DRM_MODE_CONNECTOR_Component, "component" },
++	{ DRM_MODE_CONNECTOR_9PinDIN, "9-pin DIN" },
++	{ DRM_MODE_CONNECTOR_DisplayPort, "displayport" },
++	{ DRM_MODE_CONNECTOR_HDMIA, "HDMI-A" },
++	{ DRM_MODE_CONNECTOR_HDMIB, "HDMI-B" },
++	{ DRM_MODE_CONNECTOR_TV, "TV" },
++	{ DRM_MODE_CONNECTOR_eDP, "embedded displayport" },
++};
++
++type_name_fn(connector_type)
++
++static void dump_encoders(void)
++{
++	drmModeEncoder *encoder;
++	int i;
++
++	printf("Encoders:\n");
++	printf("id\tcrtc\ttype\tpossible crtcs\tpossible clones\t\n");
++	for (i = 0; i < resources->count_encoders; i++) {
++		encoder = drmModeGetEncoder(fd, resources->encoders[i]);
++
++		if (!encoder) {
++			fprintf(stderr, "could not get encoder %i: %s\n",
++				resources->encoders[i], strerror(errno));
++			continue;
++		}
++		printf("%d\t%d\t%s\t0x%08x\t0x%08x\n",
++		       encoder->encoder_id,
++		       encoder->crtc_id,
++		       encoder_type_str(encoder->encoder_type),
++		       encoder->possible_crtcs,
++		       encoder->possible_clones);
++		drmModeFreeEncoder(encoder);
++	}
++	printf("\n");
++}
++
++static void dump_mode(drmModeModeInfo *mode)
++{
++	printf("  %s %d %d %d %d %d %d %d %d %d\n",
++	       mode->name,
++	       mode->vrefresh,
++	       mode->hdisplay,
++	       mode->hsync_start,
++	       mode->hsync_end,
++	       mode->htotal,
++	       mode->vdisplay,
++	       mode->vsync_start,
++	       mode->vsync_end,
++	       mode->vtotal);
++}
++
++static void dump_props(drmModeConnector *connector)
++{
++	drmModePropertyPtr props;
++	int i;
++
++	for (i = 0; i < connector->count_props; i++) {
++		props = drmModeGetProperty(fd, connector->props[i]);
++		printf("\t%s, flags %d\n", props->name, props->flags);
++		drmModeFreeProperty(props);
++	}
++}
++
++static void dump_connectors(void)
++{
++	drmModeConnector *connector;
++	int i, j;
++
++	printf("Connectors:\n");
++	printf("id\tencoder\tstatus\t\ttype\tsize (mm)\tmodes\tencoders\n");
++	for (i = 0; i < resources->count_connectors; i++) {
++		connector = drmModeGetConnector(fd, resources->connectors[i]);
++
++		if (!connector) {
++			fprintf(stderr, "could not get connector %i: %s\n",
++				resources->connectors[i], strerror(errno));
++			continue;
++		}
++
++		printf("%d\t%d\t%s\t%s\t%dx%d\t\t%d\t",
++		       connector->connector_id,
++		       connector->encoder_id,
++		       connector_status_str(connector->connection),
++		       connector_type_str(connector->connector_type),
++		       connector->mmWidth, connector->mmHeight,
++		       connector->count_modes);
++
++		for (j = 0; j < connector->count_encoders; j++)
++			printf("%s%d", j > 0 ? ", " : "",
++							connector->encoders[j]);
++		printf("\n");
++
++		if (!connector->count_modes)
++			continue;
++
++		printf("  modes:\n");
++		printf("  name refresh (Hz) hdisp hss hse htot vdisp "
++		       "vss vse vtot)\n");
++		for (j = 0; j < connector->count_modes; j++)
++			dump_mode(&connector->modes[j]);
++
++		printf("  props:\n");
++		dump_props(connector);
++
++		drmModeFreeConnector(connector);
++	}
++	printf("\n");
++}
++
++static void dump_crtcs(void)
++{
++	drmModeCrtc *crtc;
++	int i;
++
++	printf("CRTCs:\n");
++	printf("id\tfb\tpos\tsize\n");
++	for (i = 0; i < resources->count_crtcs; i++) {
++		crtc = drmModeGetCrtc(fd, resources->crtcs[i]);
++
++		if (!crtc) {
++			fprintf(stderr, "could not get crtc %i: %s\n",
++				resources->crtcs[i], strerror(errno));
++			continue;
++		}
++		printf("%d\t%d\t(%d,%d)\t(%dx%d)\n",
++		       crtc->crtc_id,
++		       crtc->buffer_id,
++		       crtc->x, crtc->y,
++		       crtc->width, crtc->height);
++		dump_mode(&crtc->mode);
++
++		drmModeFreeCrtc(crtc);
++	}
++	printf("\n");
++}
++
++static void dump_framebuffers(void)
++{
++	drmModeFB *fb;
++	int i;
++
++	printf("Frame buffers:\n");
++	printf("id\tsize\tpitch\n");
++	for (i = 0; i < resources->count_fbs; i++) {
++		fb = drmModeGetFB(fd, resources->fbs[i]);
++
++		if (!fb) {
++			fprintf(stderr, "could not get fb %i: %s\n",
++				resources->fbs[i], strerror(errno));
++			continue;
++		}
++		printf("%u\t(%ux%u)\t%u\n",
++		       fb->fb_id,
++		       fb->width, fb->height,
++		       fb->pitch);
++
++		drmModeFreeFB(fb);
++	}
++	printf("\n");
++}
++
++/*
++ * Mode setting with the kernel interfaces is a bit of a chore.
++ * First you have to find the connector in question and make sure the
++ * requested mode is available.
++ * Then you need to find the encoder attached to that connector so you
++ * can bind it with a free crtc.
++ */
++
++void connector_find_mode(struct connector *c)
++{
++	drmModeConnector *connector;
++	int i, j;
++
++	/* First, find the connector & mode */
++	c->mode = NULL;
++	for (i = 0; i < resources->count_connectors; i++) {
++		connector = drmModeGetConnector(fd, resources->connectors[i]);
++
++		if (!connector) {
++			fprintf(stderr, "could not get connector %i: %s\n",
++				resources->connectors[i], strerror(errno));
++			drmModeFreeConnector(connector);
++			continue;
++		}
++
++		if (!connector->count_modes) {
++			drmModeFreeConnector(connector);
++			continue;
++		}
++
++		if (connector->connector_id != c->id) {
++			drmModeFreeConnector(connector);
++			continue;
++		}
++
++		for (j = 0; j < connector->count_modes; j++) {
++			c->mode = &connector->modes[j];
++			if (!strcmp(c->mode->name, c->mode_str))
++				break;
++		}
++
++		/* Found it, break out */
++		if (c->mode)
++			break;
++
++		drmModeFreeConnector(connector);
++	}
++
++	if (!c->mode) {
++		fprintf(stderr, "failed to find mode \"%s\"\n", c->mode_str);
++		return;
++	}
++
++	/* Now get the encoder */
++	for (i = 0; i < resources->count_encoders; i++) {
++		c->encoder = drmModeGetEncoder(fd, resources->encoders[i]);
++
++		if (!c->encoder) {
++			fprintf(stderr, "could not get encoder %i: %s\n",
++				resources->encoders[i], strerror(errno));
++			drmModeFreeEncoder(c->encoder);
++			continue;
++		}
++
++		if (c->encoder->encoder_id  == connector->encoder_id)
++			break;
++
++		drmModeFreeEncoder(c->encoder);
++	}
++
++	if (c->crtc == -1)
++		c->crtc = c->encoder->crtc_id;
++}
++
++extern char *optarg;
++extern int optind, opterr, optopt;
++static char optstr[] = "ecpmfo:s:v";
++
++static void usage(char *name)
++{
++	fprintf(stderr, "usage: %s [-ecpmf]\n", name);
++	fprintf(stderr, "\t-e\tlist encoders\n");
++	fprintf(stderr, "\t-c\tlist connectors\n");
++	fprintf(stderr, "\t-p\tlist CRTCs (pipes)\n");
++	fprintf(stderr, "\t-m\tlist modes\n");
++	fprintf(stderr, "\t-f\tlist framebuffers\n");
++	fprintf(stderr, "\t-v\ttest vsynced page flipping\n");
++	fprintf(stderr, "\t-o\tlist of operation id : 0: M2M, 1: Writeback, 2: Output\n");
++	fprintf(stderr, "\t-s <connector_id>:<mode>\tset a mode\n");
++	fprintf(stderr, "\t-s <connector_id>@<crtc_id>:<mode>\tset a mode\n");
++	fprintf(stderr, "\n\tDefault is to dump all info.\n");
++	exit(0);
++}
++
++#define dump_resource(res) if (res) dump_##res()
++
++int main(int argc, char **argv)
++{
++	int c;
++	int operations = 0, encoders = 0, connectors = 0, crtcs = 0, framebuffers = 0;
++	int test_vsync = 0;
++	char *modules[] = {"exynos", "i915", "radeon", "nouveau", "vmwgfx"};
++	char *modeset = NULL;
++	int i, count = 0;
++	struct connector con_args[2];
++	
++	opterr = 0;
++	while ((c = getopt(argc, argv, optstr)) != -1) {
++		switch (c) {
++		case 'e':
++			encoders = 1;
++			break;
++		case 'c':
++			connectors = 1;
++			break;
++		case 'p':
++			crtcs = 1;
++			break;
++		case 'm':
++			modes = 1;
++			break;
++		case 'f':
++			framebuffers = 1;
++			break;
++		case 'v':
++			test_vsync = 1;
++			break;
++		case 'o':
++			if (optarg)
++				sscanf(optarg, "%d", &operations);
++			break;
++		case 's':
++			modeset = strdup(optarg);
++			con_args[count].crtc = -1;
++			if (sscanf(optarg, "%d:%64s",
++				   &con_args[count].id,
++				   con_args[count].mode_str) != 2 &&
++			    sscanf(optarg, "%d@%d:%64s",
++				   &con_args[count].id,
++				   &con_args[count].crtc,
++				   con_args[count].mode_str) != 3)
++				usage(argv[0]);
++			count++;
++			break;
++		default:
++			usage(argv[0]);
++			break;
++		}
++	}
++
++	if (argc == 1)
++		encoders = connectors = crtcs = modes = framebuffers = 1;
++
++	for (i = 0; i < ARRAY_SIZE(modules); i++) {
++		printf("trying to load module %s...", modules[i]);
++		fd = drmOpen(modules[i], NULL);
++		if (fd < 0) {
++			printf("failed.\n");
++		} else {
++			printf("success.\n");
++			break;
++		}
++	}
++
++	if (i == ARRAY_SIZE(modules)) {
++		fprintf(stderr, "failed to load any modules, aborting.\n");
++		return -1;
++	}
++
++	resources = drmModeGetResources(fd);
++	if (!resources) {
++		fprintf(stderr, "drmModeGetResources failed: %s\n",
++			strerror(errno));
++		drmClose(fd);
++		return 1;
++	}
++
++	dump_resource(encoders);
++	dump_resource(connectors);
++	dump_resource(crtcs);
++	dump_resource(framebuffers);
++
++	if (count > 0) {
++		long int sum = 0, usec[MAX_LOOP];
++
++		switch(operations) {
++		case 0:
++			fimc_m2m_set_mode(con_args, count, test_vsync, usec);
++			break;
++		case 1:
++			fimc_wb_set_mode(con_args, count, test_vsync, usec);
++			break;
++		case 2:
++			fimc_output_set_mode(con_args, count, test_vsync, usec);
++			break;
++		default:
++			break;
++		}
++
++		for (i = 0; i < MAX_LOOP; i++) {
++			printf("[%d] : %d\n", i + 1, usec[i]);
++			sum += usec[i];
++		}
++		printf("fimc : cma\n");
++		printf("avg : [%d]\n", sum / MAX_LOOP);
++		getchar();
++	}
++
++	drmModeFreeResources(resources);
++
++	return 0;
++}
+diff --git a/tests/ipptest/fimctest.h b/tests/ipptest/fimctest.h
+new file mode 100644
+index 0000000..2dd31fa
+--- /dev/null
++++ b/tests/ipptest/fimctest.h
+@@ -0,0 +1,27 @@
++#ifndef __FIMCTEST_H__
++#define __FIMCTEST_H__
++
++#include "xf86drm.h"
++#include "xf86drmMode.h"
++
++#define MAX_LOOP 20
++#define HALF_LOOP 10
++#define MAX_BUF 3
++
++struct connector {
++	uint32_t id;
++	char mode_str[64];
++	drmModeModeInfo *mode;
++	drmModeEncoder *encoder;
++	int crtc;
++	unsigned int fb_id[2], current_fb_id;
++	struct timeval start;
++
++	int swap_count;
++};
++
++extern int fd;
++
++extern void connector_find_mode(struct connector *c);
++
++#endif
+diff --git a/tests/ipptest/gem.c b/tests/ipptest/gem.c
+new file mode 100644
+index 0000000..fa228df
+--- /dev/null
++++ b/tests/ipptest/gem.c
+@@ -0,0 +1,72 @@
++/*
++ * DRM based fimc test program
++ * Copyright 2012 Samsung Electronics
++ *   Eunchul Kim <chulspro.kim@sasmsung.com>
++ *
++ * Permission is hereby granted, free of charge, to any person obtaining a
++ * copy of this software and associated documentation files (the "Software"),
++ * to deal in the Software without restriction, including without limitation
++ * the rights to use, copy, modify, merge, publish, distribute, sublicense,
++ * and/or sell copies of the Software, and to permit persons to whom the
++ * Software is furnished to do so, subject to the following conditions:
++ *
++ * The above copyright notice and this permission notice shall be included in
++ * all copies or substantial portions of the Software.
++ *
++ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
++ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
++ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
++ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
++ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
++ * FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
++ * IN THE SOFTWARE.
++ */
++
++#include <assert.h>
++#include <stdio.h>
++#include <stdlib.h>
++#include <stdint.h>
++#include <unistd.h>
++#include <string.h>
++#include <errno.h>
++
++#include "xf86drm.h"
++#include "xf86drmMode.h"
++#include "libkms.h"
++
++#include "exynos_drm.h"
++
++int exynos_gem_create(int fd, struct drm_exynos_gem_create *gem)
++{
++	int ret = 0;
++
++	if (!gem) {
++		fprintf(stderr, "gem object is null.\n");
++		return -EFAULT;
++	}
++	ret = ioctl(fd, DRM_IOCTL_EXYNOS_GEM_CREATE, gem);
++	if (ret < 0)
++		fprintf(stderr, "failed to create gem buffer: %s\n",
++								strerror(-ret));
++	return ret;
++}
++
++int exynos_gem_mmap(int fd, struct drm_exynos_gem_mmap *in_mmap)
++{
++	int ret = 0;
++
++	ret = ioctl(fd, DRM_IOCTL_EXYNOS_GEM_MMAP, in_mmap);
++	if (ret < 0)
++		fprintf(stderr, "failed to mmap: %s\n", strerror(-ret));
++	return ret;
++}
++
++int exynos_gem_close(int fd, struct drm_gem_close *gem_close)
++{
++	int ret = 0;
++
++	ret = ioctl(fd, DRM_IOCTL_GEM_CLOSE, gem_close);
++	if (ret < 0)
++		fprintf(stderr, "failed to close: %s\n", strerror(-ret));
++	return ret;
++}
+diff --git a/tests/ipptest/gem.h b/tests/ipptest/gem.h
+new file mode 100644
+index 0000000..8d4d9f1
+--- /dev/null
++++ b/tests/ipptest/gem.h
+@@ -0,0 +1,8 @@
++#ifndef __GEM_H__
++#define __GEM_H__
++
++extern int exynos_gem_create(int fd, struct drm_exynos_gem_create *gem);
++extern int exynos_gem_mmap(int fd, struct drm_exynos_gem_mmap *in_mmap);
++extern int exynos_gem_close(int fd, struct drm_gem_close *gem_close);
++
++#endif
+diff --git a/tests/ipptest/util.c b/tests/ipptest/util.c
+new file mode 100644
+index 0000000..745c212
+--- /dev/null
++++ b/tests/ipptest/util.c
+@@ -0,0 +1,132 @@
++/*
++ * DRM based fimc test program
++ * Copyright 2012 Samsung Electronics
++ *   Eunchul Kim <chulspro.kim@sasmsung.com>
++ *
++ * Permission is hereby granted, free of charge, to any person obtaining a
++ * copy of this software and associated documentation files (the "Software"),
++ * to deal in the Software without restriction, including without limitation
++ * the rights to use, copy, modify, merge, publish, distribute, sublicense,
++ * and/or sell copies of the Software, and to permit persons to whom the
++ * Software is furnished to do so, subject to the following conditions:
++ *
++ * The above copyright notice and this permission notice shall be included in
++ * all copies or substantial portions of the Software.
++ *
++ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
++ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
++ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
++ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
++ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
++ * FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
++ * IN THE SOFTWARE.
++ */
++
++#include <stdio.h>
++#include <stdlib.h>
++#include <stdint.h>
++#include <unistd.h>
++#include <string.h>
++#include <errno.h>
++
++#include "exynos_drm.h"
++#include "gem.h"
++
++int util_gem_create_mmap(int fd, struct drm_exynos_gem_create *gem,
++					struct drm_exynos_gem_mmap *mmap,
++					unsigned int size)
++{
++	/* initialize structure for gem create */
++	memset(gem, 0x00, sizeof(struct drm_exynos_gem_create));
++	gem->size = size;
++
++	if (exynos_gem_create(fd, gem) < 0) {
++		fprintf(stderr, "failed to gem create: %s\n", strerror(errno));
++		return -1;
++	}
++
++	/* initialize structure for gem mmap */
++	memset(mmap, 0x00, sizeof(struct drm_exynos_gem_mmap));
++	mmap->handle = gem->handle;
++	mmap->size = gem->size;
++
++	if (exynos_gem_mmap(fd, mmap) < 0) {
++		fprintf(stderr, "failed to gem mmap: %s\n", strerror(errno));
++		return -2;
++	}
++
++	return 0;
++}
++
++void util_draw_buffer(void *addr, unsigned int stripe,
++				unsigned int width, unsigned int height,
++				unsigned int stride, unsigned int size)
++{
++	if (stripe == 1) {
++		int i, j;
++		unsigned int *fb_ptr;
++		div_t d;
++
++		for (j = 0; j < height; j++) {
++			fb_ptr = (unsigned int *)((char *)addr + j * stride);
++			for (i = 0; i < width; i++) {
++				d = div(i, width);
++				fb_ptr[i] = 0x00130502 * (d.quot >> 6)
++						+ 0x000a1120 * (d.rem >> 6);
++			}
++		}
++	} else
++		memset(addr, 0x77, size);
++}
++
++int util_write_bmp(const char *file, const void *data, unsigned int width,
++							unsigned int height)
++{
++	int i;
++	unsigned int * blocks;
++	FILE *fp;
++	struct {
++		unsigned char magic[2];
++	} bmpfile_magic = { {'B', 'M'} };
++	struct {
++		unsigned int filesz;
++		unsigned short creator1;
++		unsigned short creator2;
++		unsigned int bmp_offset;
++	} bmpfile_header = { 0, 0, 0, 0x36 };
++	struct {
++		unsigned int header_sz;
++		unsigned int width;
++		unsigned int height;
++		unsigned short nplanes;
++		unsigned short bitspp;
++		unsigned int compress_type;
++		unsigned int bmp_bytesz;
++		unsigned int hres;
++		unsigned int vres;
++		unsigned int ncolors;
++		unsigned int nimpcolors;
++	} bmp_dib_v3_header_t = { 0x28, 0, 0, 1, 32, 0, 0, 0, 0, 0, 0 };
++
++	fp = fopen(file, "wb");
++	if (fp == NULL) return -1;
++
++	bmpfile_header.filesz = sizeof(bmpfile_magic) + sizeof(bmpfile_header)
++			+ sizeof(bmp_dib_v3_header_t) + width * height * 4;
++	bmp_dib_v3_header_t.header_sz = sizeof(bmp_dib_v3_header_t);
++	bmp_dib_v3_header_t.width = width;
++	bmp_dib_v3_header_t.height = -height;
++	bmp_dib_v3_header_t.nplanes = 1;
++	bmp_dib_v3_header_t.bmp_bytesz = width * height * 4;
++
++	fwrite(&bmpfile_magic, sizeof(bmpfile_magic), 1, fp);
++	fwrite(&bmpfile_header, sizeof(bmpfile_header), 1, fp);
++	fwrite(&bmp_dib_v3_header_t, sizeof(bmp_dib_v3_header_t), 1, fp);
++
++	blocks = (unsigned int*)data;
++	for (i = 0; i < height * width; i++)
++		fwrite(&blocks[i], 4, 1, fp);
++
++	fclose(fp);
++	return 0;
++}
+diff --git a/tests/ipptest/util.h b/tests/ipptest/util.h
+new file mode 100644
+index 0000000..e1ffcca
+--- /dev/null
++++ b/tests/ipptest/util.h
+@@ -0,0 +1,12 @@
++#ifndef __UTIL_H__
++#define __UTIL_H__
++
++extern int util_gem_create_mmap(int fd, struct drm_exynos_gem_create *gem,
++					struct drm_exynos_gem_mmap *mmap,
++					unsigned int size);
++extern void util_draw_buffer(void *addr, unsigned int stripe,
++				unsigned int width, unsigned int height,
++				unsigned int stride, unsigned int size);
++extern int util_write_bmp(const char *file, const void *data,
++				unsigned int width, unsigned int height);
++#endif
+diff --git a/tests/rottest/Makefile.am b/tests/rottest/Makefile.am
+new file mode 100644
+index 0000000..32192ba
+--- /dev/null
++++ b/tests/rottest/Makefile.am
+@@ -0,0 +1,24 @@
++AM_CFLAGS = \
++	-I$(top_srcdir)/include/drm \
++	-I$(top_srcdir)/libkms/ \
++	-I$(top_srcdir)/exynos/ \
++	-I$(top_srcdir)
++
++if HAVE_INSTALL_TESTS
++bin_PROGRAMS = \
++	rottest
++else
++noinst_PROGRAMS = \
++	rottest
++endif
++
++rottest_SOURCES = \
++	rottest.c \
++	gem.c \
++	util.c \
++	rotator.c
++
++rottest_LDADD = \
++	$(top_builddir)/libdrm.la \
++	$(top_builddir)/libkms/libkms.la \
++	$(top_builddir)/exynos/libdrm_exynos.la
+diff --git a/tests/rottest/gem.c b/tests/rottest/gem.c
+new file mode 100644
+index 0000000..001aea0
+--- /dev/null
++++ b/tests/rottest/gem.c
+@@ -0,0 +1,72 @@
++/*
++ * DRM based rotator test program
++ * Copyright 2012 Samsung Electronics
++ *   YoungJun Cho <yj44.cho@samsung.com>
++ *
++ * Permission is hereby granted, free of charge, to any person obtaining a
++ * copy of this software and associated documentation files (the "Software"),
++ * to deal in the Software without restriction, including without limitation
++ * the rights to use, copy, modify, merge, publish, distribute, sublicense,
++ * and/or sell copies of the Software, and to permit persons to whom the
++ * Software is furnished to do so, subject to the following conditions:
++ *
++ * The above copyright notice and this permission notice shall be included in
++ * all copies or substantial portions of the Software.
++ *
++ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
++ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
++ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
++ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
++ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
++ * FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
++ * IN THE SOFTWARE.
++ */
++
++#include <assert.h>
++#include <stdio.h>
++#include <stdlib.h>
++#include <stdint.h>
++#include <unistd.h>
++#include <string.h>
++#include <errno.h>
++
++#include "xf86drm.h"
++#include "xf86drmMode.h"
++#include "libkms.h"
++
++#include "exynos_drm.h"
++
++int exynos_gem_create(int fd, struct drm_exynos_gem_create *gem)
++{
++	int ret = 0;
++
++	if (!gem) {
++		fprintf(stderr, "gem object is null.\n");
++		return -EFAULT;
++	}
++	ret = ioctl(fd, DRM_IOCTL_EXYNOS_GEM_CREATE, gem);
++	if (ret < 0)
++		fprintf(stderr, "failed to create gem buffer: %s\n",
++								strerror(-ret));
++	return ret;
++}
++
++int exynos_gem_mmap(int fd, struct drm_exynos_gem_mmap *in_mmap)
++{
++	int ret = 0;
++
++	ret = ioctl(fd, DRM_IOCTL_EXYNOS_GEM_MMAP, in_mmap);
++	if (ret < 0)
++		fprintf(stderr, "failed to mmap: %s\n", strerror(-ret));
++	return ret;
++}
++
++int exynos_gem_close(int fd, struct drm_gem_close *gem_close)
++{
++	int ret = 0;
++
++	ret = ioctl(fd, DRM_IOCTL_GEM_CLOSE, gem_close);
++	if (ret < 0)
++		fprintf(stderr, "failed to close: %s\n", strerror(-ret));
++	return ret;
++}
+diff --git a/tests/rottest/gem.h b/tests/rottest/gem.h
+new file mode 100644
+index 0000000..8d4d9f1
+--- /dev/null
++++ b/tests/rottest/gem.h
+@@ -0,0 +1,8 @@
++#ifndef __GEM_H__
++#define __GEM_H__
++
++extern int exynos_gem_create(int fd, struct drm_exynos_gem_create *gem);
++extern int exynos_gem_mmap(int fd, struct drm_exynos_gem_mmap *in_mmap);
++extern int exynos_gem_close(int fd, struct drm_gem_close *gem_close);
++
++#endif
+diff --git a/tests/rottest/rotator.c b/tests/rottest/rotator.c
+new file mode 100644
+index 0000000..a7cf50b
+--- /dev/null
++++ b/tests/rottest/rotator.c
+@@ -0,0 +1,605 @@
++/*
++ * DRM based rotator test program
++ * Copyright 2012 Samsung Electronics
++ *   YoungJun Cho <yj44.cho@samsung.com>
++ *
++ * Permission is hereby granted, free of charge, to any person obtaining a
++ * copy of this software and associated documentation files (the "Software"),
++ * to deal in the Software without restriction, including without limitation
++ * the rights to use, copy, modify, merge, publish, distribute, sublicense,
++ * and/or sell copies of the Software, and to permit persons to whom the
++ * Software is furnished to do so, subject to the following conditions:
++ *
++ * The above copyright notice and this permission notice shall be included in
++ * all copies or substantial portions of the Software.
++ *
++ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
++ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
++ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
++ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
++ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
++ * FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
++ * IN THE SOFTWARE.
++ */
++
++#include <stdio.h>
++#include <stdlib.h>
++#include <stdint.h>
++#include <unistd.h>
++#include <string.h>
++#include <errno.h>
++#include <sys/time.h>
++#include <sys/mman.h>
++
++#include "exynos_drm.h"
++#include "rottest.h"
++#include "gem.h"
++#include "util.h"
++
++#include "drm_fourcc.h"
++
++static int exynos_drm_ipp_set_property(int fd,
++				struct drm_exynos_ipp_property *property,
++				struct drm_exynos_pos *src_pos,
++				struct drm_exynos_sz *src_sz,
++				struct drm_exynos_pos *dst_pos,
++				struct drm_exynos_sz *dst_sz)
++{
++	int ret;
++
++	memset(property, 0x00, sizeof(struct drm_exynos_ipp_property));
++
++	property->cmd = IPP_CMD_M2M;
++
++	property->config[EXYNOS_DRM_OPS_SRC].ops_id = EXYNOS_DRM_OPS_SRC;
++	property->config[EXYNOS_DRM_OPS_SRC].flip = EXYNOS_DRM_FLIP_NONE;
++	property->config[EXYNOS_DRM_OPS_SRC].degree = EXYNOS_DRM_DEGREE_0;
++	property->config[EXYNOS_DRM_OPS_SRC].fmt = DRM_FORMAT_XRGB8888;
++	property->config[EXYNOS_DRM_OPS_SRC].pos = *src_pos;
++	property->config[EXYNOS_DRM_OPS_SRC].sz = *src_sz;
++
++	property->config[EXYNOS_DRM_OPS_DST].ops_id = EXYNOS_DRM_OPS_DST;
++	property->config[EXYNOS_DRM_OPS_DST].flip = EXYNOS_DRM_FLIP_NONE;
++	property->config[EXYNOS_DRM_OPS_DST].degree = EXYNOS_DRM_DEGREE_90;
++	property->config[EXYNOS_DRM_OPS_DST].fmt = DRM_FORMAT_XRGB8888;
++	property->config[EXYNOS_DRM_OPS_DST].pos = *dst_pos;
++	property->config[EXYNOS_DRM_OPS_DST].sz = *dst_sz;
++
++	ret = ioctl(fd, DRM_IOCTL_EXYNOS_IPP_SET_PROPERTY, property);
++	if (ret)
++		fprintf(stderr,
++			"failed to DRM_IOCTL_EXYNOS_IPP_SET_PROPERTY : %s\n",
++			strerror(errno));
++
++	return ret;
++}
++
++static int exynos_drm_ipp_queue_buf(int fd, int prop_id,
++					struct drm_exynos_ipp_queue_buf *qbuf,
++					enum drm_exynos_ops_id ops_id,
++					enum drm_exynos_ipp_buf_type buf_type,
++					unsigned int buf_id,
++					unsigned int gem_handle)
++{
++	int ret;
++
++	memset(qbuf, 0x00, sizeof(struct drm_exynos_ipp_queue_buf));
++
++	qbuf->ops_id = ops_id;
++	qbuf->buf_type = buf_type;
++	qbuf->user_data = 0;
++	qbuf->prop_id = prop_id;
++	qbuf->buf_id = buf_id;
++	qbuf->handle[EXYNOS_DRM_PLANAR_Y] = gem_handle;
++	qbuf->handle[EXYNOS_DRM_PLANAR_CB] = 0;
++	qbuf->handle[EXYNOS_DRM_PLANAR_CR] = 0;
++
++	ret = ioctl(fd, DRM_IOCTL_EXYNOS_IPP_QUEUE_BUF, qbuf);
++	if (ret)
++		fprintf(stderr,
++			"failed to DRM_IOCTL_EXYNOS_IPP_QUEUE_BUF[prop_id:%d]"\
++			"[ops_id:%d][buf_id:%d][buf_type:%d] : %s\n",
++			prop_id, ops_id, buf_id, buf_type, strerror(errno));
++ 
++	return ret;
++}
++
++static int exynos_drm_ipp_cmd_ctrl(int fd, int prop_id,
++				struct drm_exynos_ipp_cmd_ctrl *cmd_ctrl,
++				enum drm_exynos_ipp_ctrl ctrl)
++{
++	int ret;
++
++	memset(cmd_ctrl, 0x00, sizeof(struct drm_exynos_ipp_cmd_ctrl));
++
++	cmd_ctrl->prop_id = prop_id;
++	cmd_ctrl->ctrl = ctrl;
++
++	ret = ioctl(fd, DRM_IOCTL_EXYNOS_IPP_CMD_CTRL, cmd_ctrl);
++	if (ret)
++		fprintf(stderr,
++			"failed to DRM_IOCTL_EXYNOS_IPP_CMD_CTRL[prop_id:%d]"\
++			"[ctrl:%d] : %s\n", prop_id, ctrl, strerror(errno));
++
++	return ret;
++}
++
++static int rotator_set_mode_property(struct connector *c, int count,
++				unsigned int *width, unsigned int *height,
++				unsigned int *stride,
++				struct drm_exynos_ipp_property *property)
++{
++	int ret, i;
++	struct drm_exynos_pos src_pos = {0, 0, 720, 1280};
++	struct drm_exynos_sz src_sz = {720, 1280};
++	struct drm_exynos_pos dst_pos = {0, 0, 1280, 720};
++	struct drm_exynos_sz dst_sz = {1280, 720};
++
++	*width = 0;
++	*height = 0;
++
++	/* For mode */
++	for (i = 0; i < count; i++) {
++		connector_find_mode(&c[i]);
++		if (c[i].mode == NULL)
++			continue;
++
++		*width += c[i].mode->hdisplay;
++		if (*height < c[i].mode->vdisplay)
++			*height = c[i].mode->vdisplay;
++	}
++
++	*stride = *width * 4;
++
++	/* For IPP setting property */
++	ret = exynos_drm_ipp_set_property(fd, property, &src_pos, &src_sz,
++							&dst_pos, &dst_sz);
++	if (ret)
++		fprintf(stderr, "failed to ipp set property: %s\n",
++							strerror(errno));
++
++	return ret;
++}
++
++static int rotator_event_handler(int fd, int idx, int prop_id,
++				struct drm_exynos_ipp_queue_buf *src_qbuf,
++				struct drm_exynos_gem_create *src_gem,
++				struct drm_exynos_ipp_queue_buf *dst_qbuf,
++				struct drm_exynos_gem_create *dst_gem,
++				void **usr_addr, unsigned int width,
++				unsigned int height, struct timeval *begin)
++{
++	char buffer[1024];
++	int ret = 0, len, i;
++	struct drm_event *e;
++	struct drm_exynos_ipp_event *ipp_event;
++	int src_buf_id, dst_buf_id;
++	char filename[100];
++
++	len = read(fd, buffer, sizeof(buffer));
++	if (!len)
++		return 0;
++	if (len < sizeof (*e))
++		return -1;
++
++	i = 0;
++	while (i < len) {
++		e = (struct drm_event *)&buffer[i];
++		switch (e->type) {
++		case DRM_EXYNOS_IPP_EVENT:
++			ipp_event = (struct drm_exynos_ipp_event *)e;
++			src_buf_id = ipp_event->buf_id[EXYNOS_DRM_OPS_SRC];
++			dst_buf_id = ipp_event->buf_id[EXYNOS_DRM_OPS_DST];
++
++			sprintf(filename, "/opt/media/rot_%d_%d.bmp", idx,
++								dst_buf_id);
++			util_write_bmp(filename, usr_addr[dst_buf_id], width,
++									height);
++
++			gettimeofday(begin, NULL);
++			ret = exynos_drm_ipp_queue_buf(fd, prop_id, src_qbuf,
++							EXYNOS_DRM_OPS_SRC,
++							IPP_BUF_ENQUEUE,
++							src_buf_id,
++							src_gem->handle);
++			if (ret)
++				fprintf(stderr, "failed to queue src_buf\n");
++
++			ret = exynos_drm_ipp_queue_buf(fd, prop_id,
++						&dst_qbuf[dst_buf_id],
++						EXYNOS_DRM_OPS_DST,
++						IPP_BUF_ENQUEUE, dst_buf_id,
++						dst_gem[dst_buf_id].handle);
++			if (ret)
++				fprintf(stderr, "failed to queue dst_buf\n");
++			break;
++		default:
++			break;
++		}
++		i += e->length;
++	}
++
++	return ret;
++}
++
++void rotator_1_N_set_mode(struct connector *c, int count, int page_flip,
++								long int *usec)
++{
++	struct drm_exynos_ipp_property property;
++	struct drm_exynos_ipp_queue_buf qbuf1, qbuf2[MAX_BUF];
++	struct drm_exynos_ipp_cmd_ctrl cmd_ctrl;
++	unsigned int width, height, stride;
++	int ret, i, counter;
++	struct drm_exynos_gem_create gem1, gem2[MAX_BUF];
++	struct drm_exynos_gem_mmap mmap1, mmap2[MAX_BUF];
++	void *usr_addr1, *usr_addr2[MAX_BUF];
++	struct timeval begin, end;
++	struct drm_gem_close args;
++	char filename[100];
++
++	/* For setting mode / IPP setting property */
++	ret = rotator_set_mode_property(c, count, &width, &height, &stride,
++								&property);
++	if (ret) {
++		fprintf(stderr, "failed to set mode property : %s\n",
++							strerror(errno));
++		return;
++	}
++
++	/* For GEM create / mmap / draw buffer */
++	/* For source buffer */
++	ret = util_gem_create_mmap(fd, &gem1, &mmap1, &usr_addr1,
++							stride * height);
++	if (ret) {
++		fprintf(stderr, "failed to gem create mmap: %s\n",
++							strerror(errno));
++		return;
++	}
++	util_draw_buffer(usr_addr1, 1, width, height, stride, 0);
++	sprintf(filename, "/opt/media/rot_src.bmp");
++	util_write_bmp(filename, usr_addr1, width, height);
++
++	/* For destination buffer */
++	for (i = 0; i < MAX_BUF; i++) {
++		ret = util_gem_create_mmap(fd, &gem2[i], &mmap2[i],
++						&usr_addr2[i], stride * height);
++		if (ret) {
++			fprintf(stderr, "failed to gem create mmap: %d : %s\n",
++							i, strerror(errno));
++			goto err_gem_create_mmap;
++		}
++		util_draw_buffer(usr_addr2[i], 0, 0, 0, 0, stride * height);
++		sprintf(filename, "/opt/media/rot_dst%d.bmp", i);
++		util_write_bmp(filename, usr_addr2[i], height, width);
++	}
++
++	/* For IPP queueing */
++	/* For source buffer */
++	ret = exynos_drm_ipp_queue_buf(fd, property.prop_id, &qbuf1,
++					EXYNOS_DRM_OPS_SRC, IPP_BUF_ENQUEUE,
++					0, gem1.handle);
++	if (ret) {
++		fprintf(stderr, "failed to ipp queue buf src queue\n");
++		goto err_ipp_queue_buf;
++	}
++
++	/* For destination buffer */
++	for (i = 0; i < MAX_BUF; i++) {
++		ret = exynos_drm_ipp_queue_buf(fd, property.prop_id, &qbuf2[i],
++					EXYNOS_DRM_OPS_DST, IPP_BUF_ENQUEUE,
++					i, gem2[i].handle);
++		if (ret) {
++			fprintf(stderr,
++				"failed to ipp queue buf dst queue : %d\n", i);
++			goto err_ipp_queue_buf;
++		}
++	}
++
++	/* For IPP starting */
++	gettimeofday(&begin, NULL);
++	ret = exynos_drm_ipp_cmd_ctrl(fd, property.prop_id, &cmd_ctrl,
++								IPP_CTRL_PLAY);
++	if (ret) {
++		fprintf(stderr, "failed to ipp cmd ctrl IPP_CMD_M2M start\n");
++		goto err_ipp_queue_buf;
++	}
++
++	/* For IPP handling event */
++	for (i = 0; i < MAX_LOOP; i++) {
++		counter = 0;
++
++		while (1) {
++			struct timeval timeout = { .tv_sec = 3, .tv_usec = 0 };
++			fd_set fds;
++
++			FD_ZERO(&fds);
++			FD_SET(0, &fds);
++			FD_SET(fd, &fds);
++			ret = select(fd + 1, &fds, NULL, NULL, &timeout);
++			if (ret <= 0) {
++				fprintf(stderr, "select timed out or error.\n");
++				continue;
++			} else if (FD_ISSET(0, &fds))
++				break;
++
++			gettimeofday(&end, NULL);
++			usec[MAX_BUF * i + counter] =
++					(end.tv_sec - begin.tv_sec) * 1000000 +
++					(end.tv_usec - begin.tv_usec);
++
++			ret = rotator_event_handler(fd, i, property.prop_id,
++							&qbuf1, &gem1, qbuf2,
++							gem2, usr_addr2, height,
++							width, &begin);
++			if (ret) {
++				fprintf(stderr,
++					"failed to rotator_event_handler()\n");
++				goto err_rotator_event_handler;
++			}
++			if (++counter > MAX_BUF)
++				break;
++		}
++	}
++
++	/* For IPP dequeing */
++	/* For source buffer */
++	ret = exynos_drm_ipp_queue_buf(fd, property.prop_id, &qbuf1,
++				EXYNOS_DRM_OPS_SRC, IPP_BUF_DEQUEUE, 0,
++				gem1.handle);
++	if (ret) {
++		fprintf(stderr, "failed to ipp queue buf src dequeue\n");
++		goto err_rotator_event_handler;
++	}
++
++	/* For destination buffer */
++	for (i = 0; i < MAX_BUF; i++) {
++		ret = exynos_drm_ipp_queue_buf(fd, property.prop_id, &qbuf2[i],
++				EXYNOS_DRM_OPS_DST, IPP_BUF_DEQUEUE, i,
++				gem2[i].handle);
++		if (ret) {
++			fprintf(stderr,
++				"failed to ipp queue buf dst queue : %d\n", i);
++			goto err_rotator_event_handler;
++		}
++	}
++
++	/* For IPP stopping */
++	ret = exynos_drm_ipp_cmd_ctrl(fd, property.prop_id, &cmd_ctrl,
++								IPP_CTRL_STOP);
++	if (ret) {
++		fprintf(stderr, "failed to ipp cmd ctrl IPP_CMD_M2M stop\n");
++	}
++
++	/* For munmap / GEM close */
++	/* For destination buffer */
++	for (i = 0; i < MAX_BUF; i++) {
++		munmap(usr_addr2[i], mmap2[i].size);
++		memset(&args, 0x00, sizeof(struct drm_gem_close));
++		args.handle = gem2[i].handle;
++		exynos_gem_close(fd, &args);
++	}
++
++	/* For source buffer */
++	munmap(usr_addr1, mmap1.size);
++	memset(&args, 0x00, sizeof(struct drm_gem_close));
++	args.handle = gem1.handle;
++	exynos_gem_close(fd, &args);
++
++	return;
++
++err_rotator_event_handler:
++	exynos_drm_ipp_cmd_ctrl(fd, property.prop_id, &cmd_ctrl, IPP_CTRL_STOP);
++err_ipp_queue_buf:
++	for (i = 0; i < MAX_BUF; i++) {
++		exynos_drm_ipp_queue_buf(fd, property.prop_id, &qbuf2[i],
++				EXYNOS_DRM_OPS_DST, IPP_BUF_DEQUEUE, i,
++				gem2[i].handle);
++	}
++	exynos_drm_ipp_queue_buf(fd, property.prop_id, &qbuf1,
++			EXYNOS_DRM_OPS_SRC, IPP_BUF_DEQUEUE, 0, gem1.handle);
++err_gem_create_mmap:
++	for (i = 0; i < MAX_BUF; i++) {
++		munmap(usr_addr2[i], mmap2[i].size);
++		memset(&args, 0x00, sizeof(struct drm_gem_close));
++		args.handle = gem2[i].handle;
++		exynos_gem_close(fd, &args);
++	}
++
++	munmap(usr_addr1, mmap1.size);
++	memset(&args, 0x00, sizeof(struct drm_gem_close));
++	args.handle = gem1.handle;
++	exynos_gem_close(fd, &args);
++}
++
++void rotator_N_N_set_mode(struct connector *c, int count, int page_flip,
++								long int *usec)
++{
++	struct drm_exynos_ipp_property property;
++	struct drm_exynos_ipp_queue_buf qbuf1[MAX_BUF], qbuf2[MAX_BUF];
++	struct drm_exynos_ipp_cmd_ctrl cmd_ctrl;
++	unsigned int width, height, stride;
++	int ret, i, counter;
++	struct drm_exynos_gem_create gem1[MAX_BUF], gem2[MAX_BUF];
++	struct drm_exynos_gem_mmap mmap1[MAX_BUF], mmap2[MAX_BUF];
++	void *usr_addr1[MAX_BUF], *usr_addr2[MAX_BUF];
++	struct timeval begin, end;
++	struct drm_gem_close args;
++	char filename[100];
++
++	/* For setting mode / IPP setting property */
++	ret = rotator_set_mode_property(c, count, &width, &height, &stride,
++								&property);
++	if (ret) {
++		fprintf(stderr, "failed to set mode property : %s\n",
++							strerror(errno));
++		return;
++	}
++
++	/* For GEM create / mmap / draw buffer */
++	for (i = 0; i < MAX_BUF; i++) {
++		/* For source buffer */
++		ret = util_gem_create_mmap(fd, &gem1[i], &mmap1[i],
++						&usr_addr1[i], stride * height);
++		if (ret) {
++			fprintf(stderr, "failed to gem create mmap: %d : %s\n",
++							i, strerror(errno));
++			goto err_gem_create_mmap;
++		}
++		util_draw_buffer(usr_addr1[i], 1, width, height, stride, 0);
++		sprintf(filename, "/opt/media/rot_src%d.bmp", i);
++		util_write_bmp(filename, usr_addr1[i], width, height);
++
++		/* For destination buffer */
++		ret = util_gem_create_mmap(fd, &gem2[i], &mmap2[i],
++						&usr_addr2[i], stride * height);
++		if (ret) {
++			fprintf(stderr, "failed to gem create mmap: %d : %s\n",
++							i, strerror(errno));
++			goto err_gem_create_mmap;
++		}
++		util_draw_buffer(usr_addr2[i], 0, 0, 0, 0, stride * height);
++		sprintf(filename, "/opt/media/rot_dst%d.bmp", i);
++		util_write_bmp(filename, usr_addr2[i], height, width);
++	}
++
++	/* For IPP queueing */
++	for (i = 0; i < MAX_BUF; i++) {
++		/* For source buffer */
++		ret = exynos_drm_ipp_queue_buf(fd, property.prop_id, &qbuf1[i],
++					EXYNOS_DRM_OPS_SRC, IPP_BUF_ENQUEUE,
++					i, gem1[i].handle);
++		if (ret) {
++			fprintf(stderr,
++				"failed to ipp queue buf src queue : %d\n", i);
++			goto err_ipp_queue_buf;
++		}
++
++		/* For destination buffer */
++		ret = exynos_drm_ipp_queue_buf(fd, property.prop_id, &qbuf2[i],
++					EXYNOS_DRM_OPS_DST, IPP_BUF_ENQUEUE,
++					i, gem2[i].handle);
++		if (ret) {
++			fprintf(stderr,
++				"failed to ipp queue buf dst queue : %d\n", i);
++			goto err_ipp_queue_buf;
++		}
++	}
++
++	/* For IPP starting */
++	gettimeofday(&begin, NULL);
++	ret = exynos_drm_ipp_cmd_ctrl(fd, property.prop_id, &cmd_ctrl,
++								IPP_CTRL_PLAY);
++	if (ret) {
++		fprintf(stderr, "failed to ipp cmd ctrl IPP_CMD_M2M start\n");
++		goto err_ipp_queue_buf;
++	}
++
++	/* For IPP handling event */
++	for (i = 0; i < MAX_LOOP; i++) {
++		counter = 0;
++
++		while (1) {
++			struct timeval timeout = { .tv_sec = 3, .tv_usec = 0 };
++			fd_set fds;
++
++			FD_ZERO(&fds);
++			FD_SET(0, &fds);
++			FD_SET(fd, &fds);
++			ret = select(fd + 1, &fds, NULL, NULL, &timeout);
++			if (ret <= 0) {
++				fprintf(stderr, "select timed out or error.\n");
++				continue;
++			} else if (FD_ISSET(0, &fds))
++				break;
++
++			gettimeofday(&end, NULL);
++			usec[MAX_BUF * i + counter] =
++					(end.tv_sec - begin.tv_sec) * 1000000 +
++					(end.tv_usec - begin.tv_usec);
++
++			ret = rotator_event_handler(fd, i, property.prop_id,
++							qbuf1, gem1, qbuf2,
++							gem2, usr_addr2, height,
++							width, &begin);
++			if (ret) {
++				fprintf(stderr,
++					"failed to rotator_event_handler()\n");
++				goto err_rotator_event_handler;
++			}
++			if (++counter > MAX_BUF)
++				break;
++		}
++	}
++
++	/* For IPP dequeing */
++	for (i = 0; i < MAX_BUF; i++) {
++		/* For destination buffer */
++		ret = exynos_drm_ipp_queue_buf(fd, property.prop_id, &qbuf2[i],
++				EXYNOS_DRM_OPS_DST, IPP_BUF_DEQUEUE, i,
++				gem2[i].handle);
++		if (ret) {
++			fprintf(stderr,
++				"failed to ipp queue buf dst dequeue: %d\n", i);
++			goto err_rotator_event_handler;
++		}
++
++		/* For source buffer */
++		ret = exynos_drm_ipp_queue_buf(fd, property.prop_id, &qbuf1[i],
++				EXYNOS_DRM_OPS_SRC, IPP_BUF_DEQUEUE, i,
++				gem1[i].handle);
++		if (ret) {
++			fprintf(stderr,
++				"failed to ipp queue buf src dequeue: %d\n", i);
++			goto err_rotator_event_handler;
++		}
++	}
++
++	/* For IPP stopping */
++	ret = exynos_drm_ipp_cmd_ctrl(fd, property.prop_id, &cmd_ctrl,
++								IPP_CTRL_STOP);
++	if (ret) {
++		fprintf(stderr, "failed to ipp cmd ctrl IPP_CMD_M2M stop\n");
++	}
++
++	/* For munmap / GEM close */
++	for (i = 0; i < MAX_BUF; i++) {
++		/* For destination buffer */
++		munmap(usr_addr2[i], mmap2[i].size);
++		memset(&args, 0x00, sizeof(struct drm_gem_close));
++		args.handle = gem2[i].handle;
++		exynos_gem_close(fd, &args);
++
++		/* For source buffer */
++		munmap(usr_addr1[i], mmap1[i].size);
++		memset(&args, 0x00, sizeof(struct drm_gem_close));
++		args.handle = gem1[i].handle;
++		exynos_gem_close(fd, &args);
++	}
++
++	return;
++
++err_rotator_event_handler:
++	exynos_drm_ipp_cmd_ctrl(fd, property.prop_id, &cmd_ctrl, IPP_CTRL_STOP);
++err_ipp_queue_buf:
++	for (i = 0; i < MAX_BUF; i++) {
++		exynos_drm_ipp_queue_buf(fd, property.prop_id, &qbuf2[i],
++				EXYNOS_DRM_OPS_DST, IPP_BUF_DEQUEUE, i,
++				gem2[i].handle);
++
++		exynos_drm_ipp_queue_buf(fd, property.prop_id, &qbuf1[i],
++				EXYNOS_DRM_OPS_SRC, IPP_BUF_DEQUEUE, i,
++				gem1[i].handle);
++	}
++err_gem_create_mmap:
++	for (i = 0; i < MAX_BUF; i++) {
++		munmap(usr_addr2[i], mmap2[i].size);
++		memset(&args, 0x00, sizeof(struct drm_gem_close));
++		args.handle = gem2[i].handle;
++		exynos_gem_close(fd, &args);
++
++		munmap(usr_addr1, mmap1[i].size);
++		memset(&args, 0x00, sizeof(struct drm_gem_close));
++		args.handle = gem1[i].handle;
++		exynos_gem_close(fd, &args);
++	}
++}
+diff --git a/tests/rottest/rotator.h b/tests/rottest/rotator.h
+new file mode 100644
+index 0000000..5962a47
+--- /dev/null
++++ b/tests/rottest/rotator.h
+@@ -0,0 +1,9 @@
++#ifndef __ROTATOR_H__
++#define __ROTATOR_H__
++
++extern void rotator_1_N_set_mode(struct connector *c, int count, int page_flip,
++								long int *usec);
++extern void rotator_N_N_set_mode(struct connector *c, int count, int page_flip,
++								long int *usec);
++
++#endif
+diff --git a/tests/rottest/rottest.c b/tests/rottest/rottest.c
+new file mode 100644
+index 0000000..1f69091
+--- /dev/null
++++ b/tests/rottest/rottest.c
+@@ -0,0 +1,464 @@
++/*
++ * DRM based rotator test program
++ * Copyright 2012 Samsung Electronics
++ *   YoungJun Cho <yj44.cho@sasmsung.com>
++ *
++ * Permission is hereby granted, free of charge, to any person obtaining a
++ * copy of this software and associated documentation files (the "Software"),
++ * to deal in the Software without restriction, including without limitation
++ * the rights to use, copy, modify, merge, publish, distribute, sublicense,
++ * and/or sell copies of the Software, and to permit persons to whom the
++ * Software is furnished to do so, subject to the following conditions:
++ *
++ * The above copyright notice and this permission notice shall be included in
++ * all copies or substantial portions of the Software.
++ *
++ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
++ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
++ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
++ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
++ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
++ * FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
++ * IN THE SOFTWARE.
++ */
++
++/*
++ * This fairly simple test program dumps output in a similar format to the
++ * "xrandr" tool everyone knows & loves.  It's necessarily slightly different
++ * since the kernel separates outputs into encoder and connector structures,
++ * each with their own unique ID.  The program also allows test testing of the
++ * memory management and mode setting APIs by allowing the user to specify a
++ * connector and mode to use for mode setting.  If all works as expected, a
++ * blue background should be painted on the monitor attached to the specified
++ * connector after the selected mode is set.
++ *
++ */
++
++#include "config.h"
++
++#include <assert.h>
++#include <stdio.h>
++#include <stdlib.h>
++#include <stdint.h>
++#include <unistd.h>
++#include <string.h>
++#include <errno.h>
++#include <sys/poll.h>
++#include <sys/time.h>
++#include <sys/mman.h>
++
++#include "libkms.h"
++
++#include "exynos_drm.h"
++
++#include "rottest.h"
++#include "rotator.h"
++
++drmModeRes *resources;
++int fd, modes;
++
++#define ARRAY_SIZE(arr) (sizeof(arr) / sizeof((arr)[0]))
++
++struct type_name {
++	int type;
++	char *name;
++};
++
++#define type_name_fn(res) \
++char * res##_str(int type) {			\
++	int i;						\
++	for (i = 0; i < ARRAY_SIZE(res##_names); i++) { \
++		if (res##_names[i].type == type)	\
++			return res##_names[i].name;	\
++	}						\
++	return "(invalid)";				\
++}
++
++struct type_name encoder_type_names[] = {
++	{ DRM_MODE_ENCODER_NONE, "none" },
++	{ DRM_MODE_ENCODER_DAC, "DAC" },
++	{ DRM_MODE_ENCODER_TMDS, "TMDS" },
++	{ DRM_MODE_ENCODER_LVDS, "LVDS" },
++	{ DRM_MODE_ENCODER_TVDAC, "TVDAC" },
++};
++
++type_name_fn(encoder_type)
++
++struct type_name connector_status_names[] = {
++	{ DRM_MODE_CONNECTED, "connected" },
++	{ DRM_MODE_DISCONNECTED, "disconnected" },
++	{ DRM_MODE_UNKNOWNCONNECTION, "unknown" },
++};
++
++type_name_fn(connector_status)
++
++struct type_name connector_type_names[] = {
++	{ DRM_MODE_CONNECTOR_Unknown, "unknown" },
++	{ DRM_MODE_CONNECTOR_VGA, "VGA" },
++	{ DRM_MODE_CONNECTOR_DVII, "DVI-I" },
++	{ DRM_MODE_CONNECTOR_DVID, "DVI-D" },
++	{ DRM_MODE_CONNECTOR_DVIA, "DVI-A" },
++	{ DRM_MODE_CONNECTOR_Composite, "composite" },
++	{ DRM_MODE_CONNECTOR_SVIDEO, "s-video" },
++	{ DRM_MODE_CONNECTOR_LVDS, "LVDS" },
++	{ DRM_MODE_CONNECTOR_Component, "component" },
++	{ DRM_MODE_CONNECTOR_9PinDIN, "9-pin DIN" },
++	{ DRM_MODE_CONNECTOR_DisplayPort, "displayport" },
++	{ DRM_MODE_CONNECTOR_HDMIA, "HDMI-A" },
++	{ DRM_MODE_CONNECTOR_HDMIB, "HDMI-B" },
++	{ DRM_MODE_CONNECTOR_TV, "TV" },
++	{ DRM_MODE_CONNECTOR_eDP, "embedded displayport" },
++};
++
++type_name_fn(connector_type)
++
++static void dump_encoders(void)
++{
++	drmModeEncoder *encoder;
++	int i;
++
++	printf("Encoders:\n");
++	printf("id\tcrtc\ttype\tpossible crtcs\tpossible clones\t\n");
++	for (i = 0; i < resources->count_encoders; i++) {
++		encoder = drmModeGetEncoder(fd, resources->encoders[i]);
++
++		if (!encoder) {
++			fprintf(stderr, "could not get encoder %i: %s\n",
++				resources->encoders[i], strerror(errno));
++			continue;
++		}
++		printf("%d\t%d\t%s\t0x%08x\t0x%08x\n",
++		       encoder->encoder_id,
++		       encoder->crtc_id,
++		       encoder_type_str(encoder->encoder_type),
++		       encoder->possible_crtcs,
++		       encoder->possible_clones);
++		drmModeFreeEncoder(encoder);
++	}
++	printf("\n");
++}
++
++static void dump_mode(drmModeModeInfo *mode)
++{
++	printf("  %s %d %d %d %d %d %d %d %d %d\n",
++	       mode->name,
++	       mode->vrefresh,
++	       mode->hdisplay,
++	       mode->hsync_start,
++	       mode->hsync_end,
++	       mode->htotal,
++	       mode->vdisplay,
++	       mode->vsync_start,
++	       mode->vsync_end,
++	       mode->vtotal);
++}
++
++static void dump_props(drmModeConnector *connector)
++{
++	drmModePropertyPtr props;
++	int i;
++
++	for (i = 0; i < connector->count_props; i++) {
++		props = drmModeGetProperty(fd, connector->props[i]);
++		printf("\t%s, flags %d\n", props->name, props->flags);
++		drmModeFreeProperty(props);
++	}
++}
++
++static void dump_connectors(void)
++{
++	drmModeConnector *connector;
++	int i, j;
++
++	printf("Connectors:\n");
++	printf("id\tencoder\tstatus\t\ttype\tsize (mm)\tmodes\tencoders\n");
++	for (i = 0; i < resources->count_connectors; i++) {
++		connector = drmModeGetConnector(fd, resources->connectors[i]);
++
++		if (!connector) {
++			fprintf(stderr, "could not get connector %i: %s\n",
++				resources->connectors[i], strerror(errno));
++			continue;
++		}
++
++		printf("%d\t%d\t%s\t%s\t%dx%d\t\t%d\t",
++		       connector->connector_id,
++		       connector->encoder_id,
++		       connector_status_str(connector->connection),
++		       connector_type_str(connector->connector_type),
++		       connector->mmWidth, connector->mmHeight,
++		       connector->count_modes);
++
++		for (j = 0; j < connector->count_encoders; j++)
++			printf("%s%d", j > 0 ? ", " : "",
++							connector->encoders[j]);
++		printf("\n");
++
++		if (!connector->count_modes)
++			continue;
++
++		printf("  modes:\n");
++		printf("  name refresh (Hz) hdisp hss hse htot vdisp "
++		       "vss vse vtot)\n");
++		for (j = 0; j < connector->count_modes; j++)
++			dump_mode(&connector->modes[j]);
++
++		printf("  props:\n");
++		dump_props(connector);
++
++		drmModeFreeConnector(connector);
++	}
++	printf("\n");
++}
++
++static void dump_crtcs(void)
++{
++	drmModeCrtc *crtc;
++	int i;
++
++	printf("CRTCs:\n");
++	printf("id\tfb\tpos\tsize\n");
++	for (i = 0; i < resources->count_crtcs; i++) {
++		crtc = drmModeGetCrtc(fd, resources->crtcs[i]);
++
++		if (!crtc) {
++			fprintf(stderr, "could not get crtc %i: %s\n",
++				resources->crtcs[i], strerror(errno));
++			continue;
++		}
++		printf("%d\t%d\t(%d,%d)\t(%dx%d)\n",
++		       crtc->crtc_id,
++		       crtc->buffer_id,
++		       crtc->x, crtc->y,
++		       crtc->width, crtc->height);
++		dump_mode(&crtc->mode);
++
++		drmModeFreeCrtc(crtc);
++	}
++	printf("\n");
++}
++
++static void dump_framebuffers(void)
++{
++	drmModeFB *fb;
++	int i;
++
++	printf("Frame buffers:\n");
++	printf("id\tsize\tpitch\n");
++	for (i = 0; i < resources->count_fbs; i++) {
++		fb = drmModeGetFB(fd, resources->fbs[i]);
++
++		if (!fb) {
++			fprintf(stderr, "could not get fb %i: %s\n",
++				resources->fbs[i], strerror(errno));
++			continue;
++		}
++		printf("%u\t(%ux%u)\t%u\n",
++		       fb->fb_id,
++		       fb->width, fb->height,
++		       fb->pitch);
++
++		drmModeFreeFB(fb);
++	}
++	printf("\n");
++}
++
++/*
++ * Mode setting with the kernel interfaces is a bit of a chore.
++ * First you have to find the connector in question and make sure the
++ * requested mode is available.
++ * Then you need to find the encoder attached to that connector so you
++ * can bind it with a free crtc.
++ */
++
++void connector_find_mode(struct connector *c)
++{
++	drmModeConnector *connector;
++	int i, j;
++
++	/* First, find the connector & mode */
++	c->mode = NULL;
++	for (i = 0; i < resources->count_connectors; i++) {
++		connector = drmModeGetConnector(fd, resources->connectors[i]);
++
++		if (!connector) {
++			fprintf(stderr, "could not get connector %i: %s\n",
++				resources->connectors[i], strerror(errno));
++			drmModeFreeConnector(connector);
++			continue;
++		}
++
++		if (!connector->count_modes) {
++			drmModeFreeConnector(connector);
++			continue;
++		}
++
++		if (connector->connector_id != c->id) {
++			drmModeFreeConnector(connector);
++			continue;
++		}
++
++		for (j = 0; j < connector->count_modes; j++) {
++			c->mode = &connector->modes[j];
++			if (!strcmp(c->mode->name, c->mode_str))
++				break;
++		}
++
++		/* Found it, break out */
++		if (c->mode)
++			break;
++
++		drmModeFreeConnector(connector);
++	}
++
++	if (!c->mode) {
++		fprintf(stderr, "failed to find mode \"%s\"\n", c->mode_str);
++		return;
++	}
++
++	/* Now get the encoder */
++	for (i = 0; i < resources->count_encoders; i++) {
++		c->encoder = drmModeGetEncoder(fd, resources->encoders[i]);
++
++		if (!c->encoder) {
++			fprintf(stderr, "could not get encoder %i: %s\n",
++				resources->encoders[i], strerror(errno));
++			drmModeFreeEncoder(c->encoder);
++			continue;
++		}
++
++		if (c->encoder->encoder_id  == connector->encoder_id)
++			break;
++
++		drmModeFreeEncoder(c->encoder);
++	}
++
++	if (c->crtc == -1)
++		c->crtc = c->encoder->crtc_id;
++}
++
++extern char *optarg;
++extern int optind, opterr, optopt;
++static char optstr[] = "ecpmfn:s:v";
++
++static void usage(char *name)
++{
++	fprintf(stderr, "usage: %s [-ecpmf]\n", name);
++	fprintf(stderr, "\t-e\tlist encoders\n");
++	fprintf(stderr, "\t-c\tlist connectors\n");
++	fprintf(stderr, "\t-p\tlist CRTCs (pipes)\n");
++	fprintf(stderr, "\t-m\tlist modes\n");
++	fprintf(stderr, "\t-f\tlist framebuffers\n");
++	fprintf(stderr, "\t-n\ttest multiple buffers : 0->1:N, 1->N:N\n");
++	fprintf(stderr, "\t-v\ttest vsynced page flipping\n");
++	fprintf(stderr, "\t-s <connector_id>:<mode>\tset a mode\n");
++	fprintf(stderr, "\t-s <connector_id>@<crtc_id>:<mode>\tset a mode\n");
++	fprintf(stderr, "\n\tDefault is to dump all info.\n");
++	exit(0);
++}
++
++#define dump_resource(res) if (res) dump_##res()
++
++int main(int argc, char **argv)
++{
++	int c, i, count = 0, encoders = 0, connectors = 0, crtcs = 0,
++			framebuffers = 0, test_multiple_buf = 0, test_vsync = 0;
++	char *modules[] = {"exynos", "i915", "radeon", "nouveau", "vmwgfx"};
++	struct connector con_args[2];
++	
++	opterr = 0;
++	while ((c = getopt(argc, argv, optstr)) != -1) {
++		switch (c) {
++		case 'e':
++			encoders = 1;
++			break;
++		case 'c':
++			connectors = 1;
++			break;
++		case 'p':
++			crtcs = 1;
++			break;
++		case 'm':
++			modes = 1;
++			break;
++		case 'f':
++			framebuffers = 1;
++			break;
++		case 'n':
++			if (sscanf(optarg, "%d", &test_multiple_buf) != 1)
++				usage(argv[0]);
++			break;
++		case 'v':
++			test_vsync = 1;
++			break;
++		case 's':
++			con_args[count].crtc = -1;
++			if (sscanf(optarg, "%d:%64s",
++				   &con_args[count].id,
++				   con_args[count].mode_str) != 2 &&
++			    sscanf(optarg, "%d@%d:%64s",
++				   &con_args[count].id,
++				   &con_args[count].crtc,
++				   con_args[count].mode_str) != 3)
++				usage(argv[0]);
++			count++;
++			break;
++		default:
++			usage(argv[0]);
++			break;
++		}
++	}
++
++	if (argc == 1)
++		encoders = connectors = crtcs = modes = framebuffers = 1;
++
++	for (i = 0; i < ARRAY_SIZE(modules); i++) {
++		printf("trying to load module %s...", modules[i]);
++		fd = drmOpen(modules[i], NULL);
++		if (fd < 0)
++			printf("failed.\n");
++		else {
++			printf("success.\n");
++			break;
++		}
++	}
++
++	if (i == ARRAY_SIZE(modules)) {
++		fprintf(stderr, "failed to load any modules, aborting.\n");
++		return -1;
++	}
++
++	resources = drmModeGetResources(fd);
++	if (!resources) {
++		fprintf(stderr, "drmModeGetResources failed: %s\n",
++							strerror(errno));
++		drmClose(fd);
++		return 1;
++	}
++
++	dump_resource(encoders);
++	dump_resource(connectors);
++	dump_resource(crtcs);
++	dump_resource(framebuffers);
++
++	if (count > 0) {
++		long int sum = 0, usec[MAX_LOOP * MAX_BUF];
++
++		if (test_multiple_buf)
++			rotator_N_N_set_mode(con_args, count, test_vsync, usec);
++		else
++			rotator_1_N_set_mode(con_args, count, test_vsync, usec);
++
++		for (i = 0; i < MAX_LOOP * MAX_BUF; i++) {
++			printf("[%d] : %d\n", i + 1, usec[i]);
++			sum += usec[i];
++		}
++		printf("rotator : cma\n");
++		printf("avg : [%d]\n", sum / MAX_LOOP);
++		getchar();
++	}
++
++	drmModeFreeResources(resources);
++
++	return 0;
++}
+diff --git a/tests/rottest/rottest.h b/tests/rottest/rottest.h
+new file mode 100644
+index 0000000..f86d46b
+--- /dev/null
++++ b/tests/rottest/rottest.h
+@@ -0,0 +1,26 @@
++#ifndef __ROTTEST_H__
++#define __ROTTEST_H__
++
++#include "xf86drm.h"
++#include "xf86drmMode.h"
++
++#define MAX_LOOP 5
++#define MAX_BUF 3
++
++struct connector {
++	uint32_t id;
++	char mode_str[64];
++	drmModeModeInfo *mode;
++	drmModeEncoder *encoder;
++	int crtc;
++	unsigned int fb_id[2], current_fb_id;
++	struct timeval start;
++
++	int swap_count;
++};
++
++extern int fd;
++
++extern void connector_find_mode(struct connector *c);
++
++#endif
+diff --git a/tests/rottest/util.c b/tests/rottest/util.c
+new file mode 100644
+index 0000000..5520de3
+--- /dev/null
++++ b/tests/rottest/util.c
+@@ -0,0 +1,140 @@
++/*
++ * DRM based rotator test program
++ * Copyright 2012 Samsung Electronics
++ *   YoungJun Cho <yj44.cho@samsung.com>
++ *
++ * Permission is hereby granted, free of charge, to any person obtaining a
++ * copy of this software and associated documentation files (the "Software"),
++ * to deal in the Software without restriction, including without limitation
++ * the rights to use, copy, modify, merge, publish, distribute, sublicense,
++ * and/or sell copies of the Software, and to permit persons to whom the
++ * Software is furnished to do so, subject to the following conditions:
++ *
++ * The above copyright notice and this permission notice shall be included in
++ * all copies or substantial portions of the Software.
++ *
++ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
++ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
++ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
++ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
++ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
++ * FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
++ * IN THE SOFTWARE.
++ */
++
++#include <stdio.h>
++#include <stdlib.h>
++#include <stdint.h>
++#include <unistd.h>
++#include <string.h>
++#include <errno.h>
++
++#include "exynos_drm.h"
++#include "gem.h"
++
++int util_gem_create_mmap(int fd, struct drm_exynos_gem_create *gem,
++					struct drm_exynos_gem_mmap *mmap,
++					void **addr,
++					unsigned int size)
++{
++	struct drm_gem_close args;
++
++	/* initialize structure for gem create */
++	memset(gem, 0x00, sizeof(struct drm_exynos_gem_create));
++	gem->size = size;
++
++	if (exynos_gem_create(fd, gem) < 0) {
++		fprintf(stderr, "failed to gem create: %s\n", strerror(errno));
++		return -1;
++	}
++
++	/* initialize structure for gem mmap */
++	memset(mmap, 0x00, sizeof(struct drm_exynos_gem_mmap));
++	mmap->handle = gem->handle;
++	mmap->size = gem->size;
++
++	if (exynos_gem_mmap(fd, mmap) < 0) {
++		fprintf(stderr, "failed to gem mmap: %s\n", strerror(errno));
++		memset(&args, 0x00, sizeof(struct drm_gem_close));
++		args.handle = gem->handle;
++		exynos_gem_close(fd, &args);
++		return -2;
++	}
++
++	*addr = (void *)(unsigned long)mmap->mapped;
++
++	return 0;
++}
++
++void util_draw_buffer(void *addr, unsigned int stripe,
++				unsigned int width, unsigned int height,
++				unsigned int stride, unsigned int size)
++{
++	if (stripe == 1) {
++		int i, j;
++		unsigned int *fb_ptr;
++		div_t d;
++
++		for (j = 0; j < height; j++) {
++			fb_ptr = (unsigned int *)((char *)addr + j * stride);
++			for (i = 0; i < width; i++) {
++				d = div(i, width);
++				fb_ptr[i] = 0x00130502 * (d.quot >> 6)
++						+ 0x000a1120 * (d.rem >> 6);
++			}
++		}
++	} else
++		memset(addr, 0x77, size);
++}
++
++int util_write_bmp(const char *file, const void *data, unsigned int width,
++							unsigned int height)
++{
++	int i;
++	unsigned int * blocks;
++	FILE *fp;
++	struct {
++		unsigned char magic[2];
++	} bmpfile_magic = { {'B', 'M'} };
++	struct {
++		unsigned int filesz;
++		unsigned short creator1;
++		unsigned short creator2;
++		unsigned int bmp_offset;
++	} bmpfile_header = { 0, 0, 0, 0x36 };
++	struct {
++		unsigned int header_sz;
++		unsigned int width;
++		unsigned int height;
++		unsigned short nplanes;
++		unsigned short bitspp;
++		unsigned int compress_type;
++		unsigned int bmp_bytesz;
++		unsigned int hres;
++		unsigned int vres;
++		unsigned int ncolors;
++		unsigned int nimpcolors;
++	} bmp_dib_v3_header_t = { 0x28, 0, 0, 1, 32, 0, 0, 0, 0, 0, 0 };
++
++	fp = fopen(file, "wb");
++	if (fp == NULL) return -1;
++
++	bmpfile_header.filesz = sizeof(bmpfile_magic) + sizeof(bmpfile_header)
++			+ sizeof(bmp_dib_v3_header_t) + width * height * 4;
++	bmp_dib_v3_header_t.header_sz = sizeof(bmp_dib_v3_header_t);
++	bmp_dib_v3_header_t.width = width;
++	bmp_dib_v3_header_t.height = -height;
++	bmp_dib_v3_header_t.nplanes = 1;
++	bmp_dib_v3_header_t.bmp_bytesz = width * height * 4;
++
++	fwrite(&bmpfile_magic, sizeof(bmpfile_magic), 1, fp);
++	fwrite(&bmpfile_header, sizeof(bmpfile_header), 1, fp);
++	fwrite(&bmp_dib_v3_header_t, sizeof(bmp_dib_v3_header_t), 1, fp);
++
++	blocks = (unsigned int*)data;
++	for (i = 0; i < height * width; i++)
++		fwrite(&blocks[i], 4, 1, fp);
++
++	fclose(fp);
++	return 0;
++}
+diff --git a/tests/rottest/util.h b/tests/rottest/util.h
+new file mode 100644
+index 0000000..5b2ba98
+--- /dev/null
++++ b/tests/rottest/util.h
+@@ -0,0 +1,13 @@
++#ifndef __UTIL_H__
++#define __UTIL_H__
++
++extern int util_gem_create_mmap(int fd, struct drm_exynos_gem_create *gem,
++					struct drm_exynos_gem_mmap *mmap,
++					void **addr,
++					unsigned int size);
++extern void util_draw_buffer(void *addr, unsigned int stripe,
++				unsigned int width, unsigned int height,
++				unsigned int stride, unsigned int size);
++extern int util_write_bmp(const char *file, const void *data,
++				unsigned int width, unsigned int height);
++#endif
+diff --git a/vigs/Makefile.am b/vigs/Makefile.am
+new file mode 100644
+index 0000000..fdc7740
+--- /dev/null
++++ b/vigs/Makefile.am
+@@ -0,0 +1,24 @@
++#
++# Update "-version-number M:m:r" whenever library interface changes.
++# Only "M" part has to be updated.
++#
++
++AM_CFLAGS = \
++	$(WARN_CFLAGS) \
++	-I$(top_srcdir) \
++	-I$(top_srcdir)/vigs \
++	$(PTHREADSTUBS_CFLAGS) \
++	-I$(top_srcdir)/include/drm
++
++libdrm_vigs_la_LTLIBRARIES = libdrm_vigs.la
++libdrm_vigs_ladir = $(libdir)
++libdrm_vigs_la_LDFLAGS = -version-number 9:0:0 -no-undefined
++libdrm_vigs_la_LIBADD = ../libdrm.la @PTHREADSTUBS_LIBS@
++
++libdrm_vigs_la_SOURCES = vigs.c
++
++libdrm_vigsincludedir = ${includedir}/libdrm
++libdrm_vigsinclude_HEADERS = vigs.h
++
++pkgconfigdir = @pkgconfigdir@
++pkgconfig_DATA = libdrm_vigs.pc
+diff --git a/vigs/libdrm_vigs.pc.in b/vigs/libdrm_vigs.pc.in
+new file mode 100644
+index 0000000..676e82d
+--- /dev/null
++++ b/vigs/libdrm_vigs.pc.in
+@@ -0,0 +1,11 @@
++prefix=@prefix@
++exec_prefix=@exec_prefix@
++libdir=@libdir@
++includedir=@includedir@
++
++Name: libdrm_vigs
++Description: Userspace interface to VIGS kernel DRM services
++Version: 2.4.35
++Libs: -L${libdir} -ldrm_vigs
++Cflags: -I${includedir} -I${includedir}/libdrm -I${includedir}/vigs
++Requires.private: libdrm
+diff --git a/vigs/vigs.c b/vigs/vigs.c
+new file mode 100644
+index 0000000..33a59d7
+--- /dev/null
++++ b/vigs/vigs.c
+@@ -0,0 +1,823 @@
++/* vigs.c
++ *
++ * Copyright (c) 2013 Samsung Electronics Co., Ltd.
++ * Authors:
++ * Stanislav Vorobiov <s.vorobiov@samsung.com>
++ *
++ * Permission is hereby granted, free of charge, to any person obtaining a
++ * copy of this software and associated documentation files (the "Software"),
++ * to deal in the Software without restriction, including without limitation
++ * the rights to use, copy, modify, merge, publish, distribute, sublicense,
++ * and/or sell copies of the Software, and to permit persons to whom the
++ * Software is furnished to do so, subject to the following conditions:
++ *
++ * The above copyright notice and this permission notice (including the next
++ * paragraph) shall be included in all copies or substantial portions of the
++ * Software.
++ *
++ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
++ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
++ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.  IN NO EVENT SHALL
++ * VA LINUX SYSTEMS AND/OR ITS SUPPLIERS BE LIABLE FOR ANY CLAIM, DAMAGES OR
++ * OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE,
++ * ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
++ * OTHER DEALINGS IN THE SOFTWARE.
++ */
++
++#ifdef HAVE_CONFIG_H
++#include "config.h"
++#endif
++
++#include <assert.h>
++#include <stdlib.h>
++#include <stdio.h>
++#include <string.h>
++#include <errno.h>
++
++#include <sys/mman.h>
++#include <linux/stddef.h>
++
++#include <xf86drm.h>
++#include <xf86atomic.h>
++
++#include "vigs.h"
++#include "vigs_drm.h"
++
++#define vigs_offsetof(type, member) ((size_t)&((type*)0)->member)
++
++#define vigs_containerof(ptr, type, member) ((type*)((char*)(ptr) - vigs_offsetof(type, member)))
++
++struct vigs_drm_gem_info
++{
++    atomic_t ref_count;
++};
++
++struct vigs_drm_gem_impl
++{
++    struct vigs_drm_gem_info info;
++
++    struct vigs_drm_gem gem;
++};
++
++struct vigs_drm_surface_impl
++{
++    struct vigs_drm_gem_info gem_info;
++
++    struct vigs_drm_surface base;
++};
++
++struct vigs_drm_execbuffer_impl
++{
++    struct vigs_drm_gem_info gem_info;
++
++    struct vigs_drm_execbuffer base;
++};
++
++struct vigs_drm_fence_impl
++{
++    struct vigs_drm_fence base;
++
++    atomic_t ref_count;
++};
++
++static void vigs_drm_gem_close(struct vigs_drm_device *dev, uint32_t handle)
++{
++    struct drm_gem_close req =
++    {
++        .handle = handle,
++    };
++
++    if (handle) {
++        drmIoctl(dev->fd, DRM_IOCTL_GEM_CLOSE, &req);
++    }
++}
++
++static void vigs_drm_gem_impl_init(struct vigs_drm_gem_impl *gem_impl,
++                                   struct vigs_drm_device *dev,
++                                   uint32_t handle,
++                                   uint32_t size,
++                                   uint32_t name)
++{
++    atomic_set(&gem_impl->info.ref_count, 1);
++    gem_impl->gem.dev = dev;
++    gem_impl->gem.size = size;
++    gem_impl->gem.handle = handle;
++    gem_impl->gem.name = name;
++}
++
++int vigs_drm_device_create(int fd, struct vigs_drm_device **dev)
++{
++    drmVersionPtr version;
++    uint32_t major;
++    int ret;
++
++    *dev = calloc(sizeof(**dev), 1);
++
++    if (!*dev) {
++        ret = -ENOMEM;
++        goto fail1;
++    }
++
++    version = drmGetVersion(fd);
++
++    if (!version) {
++        ret = -EINVAL;
++        goto fail2;
++    }
++
++    major = version->version_major;
++
++    drmFreeVersion(version);
++
++    if (major != DRM_VIGS_DRIVER_VERSION) {
++        ret = -EINVAL;
++        goto fail2;
++    }
++
++    (*dev)->fd = fd;
++
++    return 0;
++
++fail2:
++    free(*dev);
++fail1:
++    *dev = NULL;
++
++    return ret;
++}
++
++void vigs_drm_device_destroy(struct vigs_drm_device *dev)
++{
++    free(dev);
++}
++
++int vigs_drm_device_get_protocol_version(struct vigs_drm_device *dev,
++                                         uint32_t *protocol_version)
++{
++    struct drm_vigs_get_protocol_version req;
++    int ret;
++
++    ret = drmIoctl(dev->fd, DRM_IOCTL_VIGS_GET_PROTOCOL_VERSION, &req);
++
++    if (ret != 0) {
++        return -errno;
++    }
++
++    if (protocol_version) {
++        *protocol_version = req.version;
++    }
++
++    return 0;
++}
++
++void vigs_drm_gem_ref(struct vigs_drm_gem *gem)
++{
++    struct vigs_drm_gem_impl *gem_impl;
++
++    if (!gem) {
++        return;
++    }
++
++    gem_impl = vigs_containerof(gem, struct vigs_drm_gem_impl, gem);
++
++    atomic_inc(&gem_impl->info.ref_count);
++}
++
++void vigs_drm_gem_unref(struct vigs_drm_gem *gem)
++{
++    struct vigs_drm_gem_impl *gem_impl;
++
++    if (!gem) {
++        return;
++    }
++
++    gem_impl = vigs_containerof(gem, struct vigs_drm_gem_impl, gem);
++
++    assert(atomic_read(&gem_impl->info.ref_count) > 0);
++    if (!atomic_dec_and_test(&gem_impl->info.ref_count)) {
++        return;
++    }
++
++    if (gem->vaddr) {
++        munmap(gem->vaddr, gem->size);
++    }
++
++    vigs_drm_gem_close(gem->dev, gem->handle);
++
++    free(gem_impl);
++}
++
++int vigs_drm_gem_get_name(struct vigs_drm_gem *gem)
++{
++    struct drm_gem_flink req =
++    {
++        .handle = gem->handle,
++    };
++    int ret;
++
++    if (gem->name) {
++        return 0;
++    }
++
++    ret = drmIoctl(gem->dev->fd, DRM_IOCTL_GEM_FLINK, &req);
++
++    if (ret != 0) {
++        return -errno;
++    }
++
++    gem->name = req.name;
++
++    return 0;
++}
++
++int vigs_drm_gem_map(struct vigs_drm_gem *gem, int track_access)
++{
++    struct drm_vigs_gem_map req =
++    {
++        .handle = gem->handle,
++        .track_access = track_access
++    };
++    int ret;
++
++    if (gem->vaddr) {
++        return 0;
++    }
++
++    ret = drmIoctl(gem->dev->fd, DRM_IOCTL_VIGS_GEM_MAP, &req);
++
++    if (ret != 0) {
++        return -errno;
++    }
++
++    gem->vaddr = (void*)req.address;
++
++    return 0;
++}
++
++void vigs_drm_gem_unmap(struct vigs_drm_gem *gem)
++{
++    if (!gem->vaddr) {
++        return;
++    }
++
++    munmap(gem->vaddr, gem->size);
++    gem->vaddr = NULL;
++}
++
++int vigs_drm_gem_wait(struct vigs_drm_gem *gem)
++{
++    struct drm_vigs_gem_wait req =
++    {
++        .handle = gem->handle,
++    };
++    int ret;
++
++    ret = drmIoctl(gem->dev->fd, DRM_IOCTL_VIGS_GEM_WAIT, &req);
++
++    if (ret != 0) {
++        return -errno;
++    }
++
++    return 0;
++}
++
++int vigs_drm_surface_create(struct vigs_drm_device *dev,
++                            uint32_t width,
++                            uint32_t height,
++                            uint32_t stride,
++                            uint32_t format,
++                            int scanout,
++                            struct vigs_drm_surface **sfc)
++{
++    struct vigs_drm_surface_impl *sfc_impl;
++    struct drm_vigs_create_surface req =
++    {
++        .width = width,
++        .height = height,
++        .stride = stride,
++        .format = format,
++        .scanout = scanout,
++    };
++    int ret;
++
++    sfc_impl = calloc(sizeof(*sfc_impl), 1);
++
++    if (!sfc_impl) {
++        ret = -ENOMEM;
++        goto fail1;
++    }
++
++    ret = drmIoctl(dev->fd, DRM_IOCTL_VIGS_CREATE_SURFACE, &req);
++
++    if (ret != 0) {
++        ret = -errno;
++        goto fail2;
++    }
++
++    vigs_drm_gem_impl_init((struct vigs_drm_gem_impl*)sfc_impl,
++                           dev,
++                           req.handle,
++                           req.size,
++                           0);
++
++    sfc_impl->base.width = width;
++    sfc_impl->base.height = height;
++    sfc_impl->base.stride = stride;
++    sfc_impl->base.format = format;
++    sfc_impl->base.scanout = scanout;
++    sfc_impl->base.id = req.id;
++
++    *sfc = &sfc_impl->base;
++
++    return 0;
++
++fail2:
++    free(sfc_impl);
++fail1:
++    *sfc = NULL;
++
++    return ret;
++}
++
++int vigs_drm_surface_open(struct vigs_drm_device *dev,
++                          uint32_t name,
++                          struct vigs_drm_surface **sfc)
++{
++    struct vigs_drm_surface_impl *sfc_impl;
++    struct drm_gem_open req =
++    {
++        .name = name,
++    };
++    struct drm_vigs_surface_info info_req;
++    int ret;
++
++    sfc_impl = calloc(sizeof(*sfc_impl), 1);
++
++    if (!sfc_impl) {
++        ret = -ENOMEM;
++        goto fail1;
++    }
++
++    ret = drmIoctl(dev->fd, DRM_IOCTL_GEM_OPEN, &req);
++
++    if (ret != 0) {
++        ret = -errno;
++        goto fail2;
++    }
++
++    info_req.handle = req.handle;
++
++    ret = drmIoctl(dev->fd, DRM_IOCTL_VIGS_SURFACE_INFO, &info_req);
++
++    if (ret != 0) {
++        ret = -errno;
++        goto fail3;
++    }
++
++    vigs_drm_gem_impl_init((struct vigs_drm_gem_impl*)sfc_impl,
++                           dev,
++                           req.handle,
++                           info_req.size,
++                           name);
++
++    sfc_impl->base.width = info_req.width;
++    sfc_impl->base.height = info_req.height;
++    sfc_impl->base.stride = info_req.stride;
++    sfc_impl->base.format = info_req.format;
++    sfc_impl->base.scanout = info_req.scanout;
++    sfc_impl->base.id = info_req.id;
++
++    *sfc = &sfc_impl->base;
++
++    return 0;
++
++fail3:
++    vigs_drm_gem_close(dev, req.handle);
++fail2:
++    free(sfc_impl);
++fail1:
++    *sfc = NULL;
++
++    return ret;
++}
++
++int vigs_drm_surface_set_gpu_dirty(struct vigs_drm_surface *sfc)
++{
++    struct drm_vigs_surface_set_gpu_dirty req =
++    {
++        .handle = sfc->gem.handle
++    };
++    int ret;
++
++    ret = drmIoctl(sfc->gem.dev->fd, DRM_IOCTL_VIGS_SURFACE_SET_GPU_DIRTY, &req);
++
++    return (ret != 0) ? -errno : 0;
++}
++
++int vigs_drm_surface_start_access(struct vigs_drm_surface *sfc,
++                                  uint32_t saf)
++{
++    struct drm_vigs_surface_start_access req =
++    {
++        .address = (unsigned long)sfc->gem.vaddr,
++        .saf = saf
++    };
++    int ret;
++
++    ret = drmIoctl(sfc->gem.dev->fd, DRM_IOCTL_VIGS_SURFACE_START_ACCESS, &req);
++
++    return (ret != 0) ? -errno : 0;
++}
++
++int vigs_drm_surface_end_access(struct vigs_drm_surface *sfc,
++                                int sync)
++{
++    struct drm_vigs_surface_end_access req =
++    {
++        .address = (unsigned long)sfc->gem.vaddr,
++        .sync = sync
++    };
++    int ret;
++
++    ret = drmIoctl(sfc->gem.dev->fd, DRM_IOCTL_VIGS_SURFACE_END_ACCESS, &req);
++
++    return (ret != 0) ? -errno : 0;
++}
++
++int vigs_drm_execbuffer_create(struct vigs_drm_device *dev,
++                               uint32_t size,
++                               struct vigs_drm_execbuffer **execbuffer)
++{
++    struct vigs_drm_execbuffer_impl *execbuffer_impl;
++    struct drm_vigs_create_execbuffer req =
++    {
++        .size = size
++    };
++    int ret;
++
++    execbuffer_impl = calloc(sizeof(*execbuffer_impl), 1);
++
++    if (!execbuffer_impl) {
++        ret = -ENOMEM;
++        goto fail1;
++    }
++
++    ret = drmIoctl(dev->fd, DRM_IOCTL_VIGS_CREATE_EXECBUFFER, &req);
++
++    if (ret != 0) {
++        ret = -errno;
++        goto fail2;
++    }
++
++    vigs_drm_gem_impl_init((struct vigs_drm_gem_impl*)execbuffer_impl,
++                           dev,
++                           req.handle,
++                           req.size,
++                           0);
++
++    *execbuffer = &execbuffer_impl->base;
++
++    return 0;
++
++fail2:
++    free(execbuffer_impl);
++fail1:
++    *execbuffer = NULL;
++
++    return ret;
++}
++
++int vigs_drm_execbuffer_open(struct vigs_drm_device *dev,
++                             uint32_t name,
++                             struct vigs_drm_execbuffer **execbuffer)
++{
++    struct vigs_drm_execbuffer_impl *execbuffer_impl;
++    struct drm_gem_open req =
++    {
++        .name = name,
++    };
++    int ret;
++
++    execbuffer_impl = calloc(sizeof(*execbuffer_impl), 1);
++
++    if (!execbuffer_impl) {
++        ret = -ENOMEM;
++        goto fail1;
++    }
++
++    ret = drmIoctl(dev->fd, DRM_IOCTL_GEM_OPEN, &req);
++
++    if (ret != 0) {
++        ret = -errno;
++        goto fail2;
++    }
++
++    vigs_drm_gem_impl_init((struct vigs_drm_gem_impl*)execbuffer_impl,
++                           dev,
++                           req.handle,
++                           req.size,
++                           name);
++
++    *execbuffer = &execbuffer_impl->base;
++
++    return 0;
++
++fail2:
++    free(execbuffer_impl);
++fail1:
++    *execbuffer = NULL;
++
++    return ret;
++}
++
++int vigs_drm_execbuffer_exec(struct vigs_drm_execbuffer *execbuffer)
++{
++    struct drm_vigs_exec req =
++    {
++        .handle = execbuffer->gem.handle
++    };
++    int ret;
++
++    ret = drmIoctl(execbuffer->gem.dev->fd, DRM_IOCTL_VIGS_EXEC, &req);
++
++    return (ret != 0) ? -errno : 0;
++}
++
++int vigs_drm_fence_create(struct vigs_drm_device *dev,
++                          int send,
++                          struct vigs_drm_fence **fence)
++{
++    struct vigs_drm_fence_impl *fence_impl;
++    struct drm_vigs_create_fence req =
++    {
++        .send = send
++    };
++    int ret;
++
++    fence_impl = calloc(sizeof(*fence_impl), 1);
++
++    if (!fence_impl) {
++        ret = -ENOMEM;
++        goto fail1;
++    }
++
++    ret = drmIoctl(dev->fd, DRM_IOCTL_VIGS_CREATE_FENCE, &req);
++
++    if (ret != 0) {
++        ret = -errno;
++        goto fail2;
++    }
++
++    atomic_set(&fence_impl->ref_count, 1);
++    fence_impl->base.dev = dev;
++    fence_impl->base.handle = req.handle;
++    fence_impl->base.seq = req.seq;
++    fence_impl->base.signaled = 0;
++
++    *fence = &fence_impl->base;
++
++    return 0;
++
++fail2:
++    free(fence_impl);
++fail1:
++    *fence = NULL;
++
++    return ret;
++}
++
++void vigs_drm_fence_ref(struct vigs_drm_fence *fence)
++{
++    struct vigs_drm_fence_impl *fence_impl;
++
++    if (!fence) {
++        return;
++    }
++
++    fence_impl = vigs_containerof(fence, struct vigs_drm_fence_impl, base);
++
++    atomic_inc(&fence_impl->ref_count);
++}
++
++void vigs_drm_fence_unref(struct vigs_drm_fence *fence)
++{
++    struct vigs_drm_fence_impl *fence_impl;
++    struct drm_vigs_fence_unref req;
++
++    if (!fence) {
++        return;
++    }
++
++    fence_impl = vigs_containerof(fence, struct vigs_drm_fence_impl, base);
++
++    assert(atomic_read(&fence_impl->ref_count) > 0);
++    if (!atomic_dec_and_test(&fence_impl->ref_count)) {
++        return;
++    }
++
++    req.handle = fence->handle;
++
++    drmIoctl(fence->dev->fd, DRM_IOCTL_VIGS_FENCE_UNREF, &req);
++
++    free(fence_impl);
++}
++
++int vigs_drm_fence_wait(struct vigs_drm_fence *fence)
++{
++    struct drm_vigs_fence_wait req =
++    {
++        .handle = fence->handle
++    };
++    int ret;
++
++    ret = drmIoctl(fence->dev->fd, DRM_IOCTL_VIGS_FENCE_WAIT, &req);
++
++    return (ret != 0) ? -errno : 0;
++}
++
++int vigs_drm_fence_check(struct vigs_drm_fence *fence)
++{
++    struct drm_vigs_fence_signaled req =
++    {
++        .handle = fence->handle
++    };
++    int ret;
++
++    if (fence->signaled) {
++        return 0;
++    }
++
++    ret = drmIoctl(fence->dev->fd, DRM_IOCTL_VIGS_FENCE_SIGNALED, &req);
++
++    if (ret != 0) {
++        return -errno;
++    }
++
++    fence->signaled = req.signaled;
++
++    return 0;
++}
++
++int vigs_drm_plane_set_zpos(struct vigs_drm_device *dev,
++                            uint32_t plane_id,
++                            int zpos)
++{
++    struct drm_vigs_plane_set_zpos req =
++    {
++        .plane_id = plane_id,
++        .zpos = zpos
++    };
++    int ret;
++
++    ret = drmIoctl(dev->fd, DRM_IOCTL_VIGS_PLANE_SET_ZPOS, &req);
++
++    return (ret != 0) ? -errno : 0;
++}
++
++int vigs_drm_plane_set_transform(struct vigs_drm_device *dev,
++                                 uint32_t plane_id,
++                                 int hflip,
++                                 int vflip,
++                                 vigs_drm_rotation rotation)
++{
++    struct drm_vigs_plane_set_transform req =
++    {
++        .plane_id = plane_id,
++        .hflip = hflip,
++        .vflip = vflip,
++        .rotation = rotation
++    };
++    int ret;
++
++    ret = drmIoctl(dev->fd, DRM_IOCTL_VIGS_PLANE_SET_TRANSFORM, &req);
++
++    return (ret != 0) ? -errno : 0;
++}
++
++int vigs_drm_dp_surface_create(struct vigs_drm_device *dev,
++                               uint32_t dp_plane,
++                               uint32_t dp_fb_buf,
++                               uint32_t dp_mem_flag,
++                               uint32_t width,
++                               uint32_t height,
++                               uint32_t stride,
++                               uint32_t format,
++                               struct vigs_drm_surface **sfc)
++{
++    struct vigs_drm_surface_impl *sfc_impl;
++    struct drm_vigs_dp_create_surface req =
++    {
++        .dp_plane = dp_plane,
++        .dp_fb_buf = dp_fb_buf,
++        .dp_mem_flag = dp_mem_flag,
++        .width = width,
++        .height = height,
++        .stride = stride,
++        .format = format,
++    };
++    int ret;
++
++    sfc_impl = calloc(sizeof(*sfc_impl), 1);
++
++    if (!sfc_impl) {
++        ret = -ENOMEM;
++        goto fail1;
++    }
++
++    ret = drmIoctl(dev->fd, DRM_IOCTL_VIGS_DP_CREATE_SURFACE, &req);
++
++    if (ret != 0) {
++        ret = -errno;
++        goto fail2;
++    }
++
++    vigs_drm_gem_impl_init((struct vigs_drm_gem_impl*)sfc_impl,
++                           dev,
++                           req.handle,
++                           req.size,
++                           0);
++
++    sfc_impl->base.width = width;
++    sfc_impl->base.height = height;
++    sfc_impl->base.stride = stride;
++    sfc_impl->base.format = format;
++    sfc_impl->base.scanout = 0;
++    sfc_impl->base.id = req.id;
++
++    *sfc = &sfc_impl->base;
++
++    return 0;
++
++fail2:
++    free(sfc_impl);
++fail1:
++    *sfc = NULL;
++
++    return ret;
++}
++
++int vigs_drm_dp_surface_open(struct vigs_drm_device *dev,
++                             uint32_t dp_plane,
++                             uint32_t dp_fb_buf,
++                             uint32_t dp_mem_flag,
++                             struct vigs_drm_surface **sfc)
++{
++    struct vigs_drm_surface_impl *sfc_impl;
++    struct drm_vigs_dp_open_surface req =
++    {
++        .dp_plane = dp_plane,
++        .dp_fb_buf = dp_fb_buf,
++        .dp_mem_flag = dp_mem_flag
++    };
++    struct drm_vigs_surface_info info_req;
++    int ret;
++
++    sfc_impl = calloc(sizeof(*sfc_impl), 1);
++
++    if (!sfc_impl) {
++        ret = -ENOMEM;
++        goto fail1;
++    }
++
++    ret = drmIoctl(dev->fd, DRM_IOCTL_VIGS_DP_OPEN_SURFACE, &req);
++
++    if (ret != 0) {
++        ret = -errno;
++        goto fail2;
++    }
++
++    info_req.handle = req.handle;
++
++    ret = drmIoctl(dev->fd, DRM_IOCTL_VIGS_SURFACE_INFO, &info_req);
++
++    if (ret != 0) {
++        ret = -errno;
++        goto fail3;
++    }
++
++    vigs_drm_gem_impl_init((struct vigs_drm_gem_impl*)sfc_impl,
++                           dev,
++                           req.handle,
++                           info_req.size,
++                           0);
++
++    sfc_impl->base.width = info_req.width;
++    sfc_impl->base.height = info_req.height;
++    sfc_impl->base.stride = info_req.stride;
++    sfc_impl->base.format = info_req.format;
++    sfc_impl->base.scanout = info_req.scanout;
++    sfc_impl->base.id = info_req.id;
++
++    *sfc = &sfc_impl->base;
++
++    return 0;
++
++fail3:
++    vigs_drm_gem_close(dev, req.handle);
++fail2:
++    free(sfc_impl);
++fail1:
++    *sfc = NULL;
++
++    return ret;
++}
+diff --git a/vigs/vigs.h b/vigs/vigs.h
+new file mode 100644
+index 0000000..7453431
+--- /dev/null
++++ b/vigs/vigs.h
+@@ -0,0 +1,293 @@
++/* vigs.h
++ *
++ * Copyright (c) 2013 Samsung Electronics Co., Ltd.
++ * Authors:
++ * Stanislav Vorobiov <s.vorobiov@samsung.com>
++ *
++ * Permission is hereby granted, free of charge, to any person obtaining a
++ * copy of this software and associated documentation files (the "Software"),
++ * to deal in the Software without restriction, including without limitation
++ * the rights to use, copy, modify, merge, publish, distribute, sublicense,
++ * and/or sell copies of the Software, and to permit persons to whom the
++ * Software is furnished to do so, subject to the following conditions:
++ *
++ * The above copyright notice and this permission notice (including the next
++ * paragraph) shall be included in all copies or substantial portions of the
++ * Software.
++ *
++ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
++ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
++ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.  IN NO EVENT SHALL
++ * VA LINUX SYSTEMS AND/OR ITS SUPPLIERS BE LIABLE FOR ANY CLAIM, DAMAGES OR
++ * OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE,
++ * ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
++ * OTHER DEALINGS IN THE SOFTWARE.
++ */
++
++#ifndef __VIGS_H__
++#define __VIGS_H__
++
++#include <stdint.h>
++#include <stdbool.h>
++
++#ifdef __cplusplus
++extern "C" {
++#endif
++
++/*
++ * Surface formats.
++ */
++typedef enum
++{
++    vigs_drm_surface_bgrx8888 = 0x0,
++    vigs_drm_surface_bgra8888 = 0x1,
++} vigs_drm_surface_format;
++
++/*
++ * Rotations.
++ */
++typedef enum
++{
++    vigs_drm_rotation_0   = 0x0,
++    vigs_drm_rotation_90  = 0x1,
++    vigs_drm_rotation_180 = 0x2,
++    vigs_drm_rotation_270 = 0x3,
++} vigs_drm_rotation;
++
++/*
++ * Surface access flags.
++ */
++#define VIGS_DRM_SAF_READ 1
++#define VIGS_DRM_SAF_WRITE 2
++
++struct vigs_drm_device
++{
++    /* DRM fd. */
++    int fd;
++};
++
++struct vigs_drm_gem
++{
++    /* VIGS device object. */
++    struct vigs_drm_device *dev;
++
++    /* size of the buffer created. */
++    uint32_t size;
++
++    /* a gem handle to gem object created. */
++    uint32_t handle;
++
++    /* a gem global handle from flink request. initially 0. */
++    uint32_t name;
++
++    /* user space address to a gem buffer mmaped. initially NULL. */
++    void *vaddr;
++};
++
++struct vigs_drm_surface
++{
++    struct vigs_drm_gem gem;
++
++    uint32_t width;
++    uint32_t height;
++    uint32_t stride;
++    uint32_t format;
++    int scanout;
++    uint32_t id;
++};
++
++struct vigs_drm_execbuffer
++{
++    struct vigs_drm_gem gem;
++};
++
++struct vigs_drm_fence
++{
++    /* VIGS device object. */
++    struct vigs_drm_device *dev;
++
++    /* a handle to fence object. */
++    uint32_t handle;
++
++    /* fence sequence number. */
++    uint32_t seq;
++
++    /* is fence signaled ? updated on 'vigs_drm_fence_check'. */
++    int signaled;
++};
++
++/*
++ * All functions return 0 on success and < 0 on error, i.e. kernel style:
++ * return -ENOMEM;
++ */
++
++/*
++ * Device functions.
++ * @{
++ */
++
++/*
++ * Returns -EINVAL on driver version mismatch.
++ */
++int vigs_drm_device_create(int fd, struct vigs_drm_device **dev);
++
++void vigs_drm_device_destroy(struct vigs_drm_device *dev);
++
++int vigs_drm_device_get_protocol_version(struct vigs_drm_device *dev,
++                                         uint32_t *protocol_version);
++
++/*
++ * @}
++ */
++
++/*
++ * GEM functions.
++ * @{
++ */
++
++/*
++ * Passing NULL won't hurt, this is for convenience.
++ */
++void vigs_drm_gem_ref(struct vigs_drm_gem *gem);
++
++/*
++ * Passing NULL won't hurt, this is for convenience.
++ */
++void vigs_drm_gem_unref(struct vigs_drm_gem *gem);
++
++int vigs_drm_gem_get_name(struct vigs_drm_gem *gem);
++
++int vigs_drm_gem_map(struct vigs_drm_gem *gem, int track_access);
++
++void vigs_drm_gem_unmap(struct vigs_drm_gem *gem);
++
++int vigs_drm_gem_wait(struct vigs_drm_gem *gem);
++
++/*
++ * @}
++ */
++
++/*
++ * Surface functions.
++ * @{
++ */
++
++int vigs_drm_surface_create(struct vigs_drm_device *dev,
++                            uint32_t width,
++                            uint32_t height,
++                            uint32_t stride,
++                            uint32_t format,
++                            int scanout,
++                            struct vigs_drm_surface **sfc);
++
++int vigs_drm_surface_open(struct vigs_drm_device *dev,
++                          uint32_t name,
++                          struct vigs_drm_surface **sfc);
++
++int vigs_drm_surface_set_gpu_dirty(struct vigs_drm_surface *sfc);
++
++int vigs_drm_surface_start_access(struct vigs_drm_surface *sfc,
++                                  uint32_t saf);
++
++int vigs_drm_surface_end_access(struct vigs_drm_surface *sfc,
++                                int sync);
++
++/*
++ * @}
++ */
++
++/*
++ * Execbuffer functions.
++ * @{
++ */
++
++int vigs_drm_execbuffer_create(struct vigs_drm_device *dev,
++                               uint32_t size,
++                               struct vigs_drm_execbuffer **execbuffer);
++
++int vigs_drm_execbuffer_open(struct vigs_drm_device *dev,
++                             uint32_t name,
++                             struct vigs_drm_execbuffer **execbuffer);
++
++int vigs_drm_execbuffer_exec(struct vigs_drm_execbuffer *execbuffer);
++
++/*
++ * @}
++ */
++
++/*
++ * Fence functions.
++ * @{
++ */
++
++int vigs_drm_fence_create(struct vigs_drm_device *dev,
++                          int send,
++                          struct vigs_drm_fence **fence);
++
++/*
++ * Passing NULL won't hurt, this is for convenience.
++ */
++void vigs_drm_fence_ref(struct vigs_drm_fence *fence);
++
++/*
++ * Passing NULL won't hurt, this is for convenience.
++ */
++void vigs_drm_fence_unref(struct vigs_drm_fence *fence);
++
++int vigs_drm_fence_wait(struct vigs_drm_fence *fence);
++
++int vigs_drm_fence_check(struct vigs_drm_fence *fence);
++
++/*
++ * @}
++ */
++
++/*
++ * Plane functions.
++ * @{
++ */
++
++int vigs_drm_plane_set_zpos(struct vigs_drm_device *dev,
++                            uint32_t plane_id,
++                            int zpos);
++
++int vigs_drm_plane_set_transform(struct vigs_drm_device *dev,
++                                 uint32_t plane_id,
++                                 int hflip,
++                                 int vflip,
++                                 vigs_drm_rotation rotation);
++
++/*
++ * @}
++ */
++
++/*
++ * DP functions.
++ * @{
++ */
++
++int vigs_drm_dp_surface_create(struct vigs_drm_device *dev,
++                               uint32_t dp_plane,
++                               uint32_t dp_fb_buf,
++                               uint32_t dp_mem_flag,
++                               uint32_t width,
++                               uint32_t height,
++                               uint32_t stride,
++                               uint32_t format,
++                               struct vigs_drm_surface **sfc);
++
++int vigs_drm_dp_surface_open(struct vigs_drm_device *dev,
++                             uint32_t dp_plane,
++                             uint32_t dp_fb_buf,
++                             uint32_t dp_mem_flag,
++                             struct vigs_drm_surface **sfc);
++
++/*
++ * @}
++ */
++
++#ifdef __cplusplus
++};
++#endif /* __cplusplus */
++
++#endif

@@ -1,0 +1,49 @@
+From: Chanho Park <chanho61.park@samsung.com>
+Date: Fri, 12 Sep 2014 18:27:05 +0900
+Subject: packaging: add tools-exynos for testing exynos_drm
+
+This patch adds tools-exynos package to test fimg2d/ipp/rottest.
+
+Change-Id: I8dbd821f056ac3f7e2a043a97d0c39bec7f75b40
+Signed-off-by: Chanho Park <chanho61.park@samsung.com>
+---
+ tests/ipptest/Makefile.am | 5 +++++
+ tests/rottest/Makefile.am | 5 +++++
+ 2 files changed, 10 insertions(+)
+
+diff --git a/tests/ipptest/Makefile.am b/tests/ipptest/Makefile.am
+index 406a293..7b10df9 100644
+--- a/tests/ipptest/Makefile.am
++++ b/tests/ipptest/Makefile.am
+@@ -4,8 +4,13 @@ AM_CFLAGS = \
+ 	-I$(top_srcdir)/exynos/ \
+ 	-I$(top_srcdir)
+ 
++if HAVE_INSTALL_TESTS
++bin_PROGRAMS = \
++	ipptest
++else
+ noinst_PROGRAMS = \
+ 	ipptest
++endif
+ 
+ ipptest_SOURCES = \
+ 	fimctest.c \
+diff --git a/tests/rottest/Makefile.am b/tests/rottest/Makefile.am
+index 3897535..32192ba 100644
+--- a/tests/rottest/Makefile.am
++++ b/tests/rottest/Makefile.am
+@@ -4,8 +4,13 @@ AM_CFLAGS = \
+ 	-I$(top_srcdir)/exynos/ \
+ 	-I$(top_srcdir)
+ 
++if HAVE_INSTALL_TESTS
++bin_PROGRAMS = \
++	rottest
++else
+ noinst_PROGRAMS = \
+ 	rottest
++endif
+ 
+ rottest_SOURCES = \
+ 	rottest.c \

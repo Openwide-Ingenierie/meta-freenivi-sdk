@@ -1,0 +1,111 @@
+From: Stanislav Vorobiov <s.vorobiov@samsung.com>
+Date: Mon, 10 Feb 2014 19:02:51 +0400
+Subject: libdrm_vigs: Scanout flag added to surfaces
+
+Change-Id: Ib6f96d2542c3df0b78f7ef1b610bcc3fa0b678d6
+Signed-off-by: Stanislav Vorobiov <s.vorobiov@samsung.com>
+---
+ include/drm/vigs_drm.h | 4 +++-
+ vigs/Makefile.am       | 2 +-
+ vigs/vigs.c            | 4 ++++
+ vigs/vigs.h            | 2 ++
+ 4 files changed, 10 insertions(+), 2 deletions(-)
+
+diff --git a/include/drm/vigs_drm.h b/include/drm/vigs_drm.h
+index 3a11ab2..3eba112 100644
+--- a/include/drm/vigs_drm.h
++++ b/include/drm/vigs_drm.h
+@@ -33,7 +33,7 @@
+ /*
+  * Bump this whenever driver interface changes.
+  */
+-#define DRM_VIGS_DRIVER_VERSION 10
++#define DRM_VIGS_DRIVER_VERSION 11
+ 
+ /*
+  * Surface access flags.
+@@ -53,6 +53,7 @@ struct drm_vigs_create_surface
+     uint32_t height;
+     uint32_t stride;
+     uint32_t format;
++    int scanout;
+     uint32_t handle;
+     uint32_t size;
+     uint32_t id;
+@@ -83,6 +84,7 @@ struct drm_vigs_surface_info
+     uint32_t height;
+     uint32_t stride;
+     uint32_t format;
++    int scanout;
+     uint32_t size;
+     uint32_t id;
+ };
+diff --git a/vigs/Makefile.am b/vigs/Makefile.am
+index df85b56..f15ceff 100644
+--- a/vigs/Makefile.am
++++ b/vigs/Makefile.am
+@@ -12,7 +12,7 @@ AM_CFLAGS = \
+ 
+ libdrm_vigs_la_LTLIBRARIES = libdrm_vigs.la
+ libdrm_vigs_ladir = $(libdir)
+-libdrm_vigs_la_LDFLAGS = -version-number 5:0:0 -no-undefined
++libdrm_vigs_la_LDFLAGS = -version-number 6:0:0 -no-undefined
+ libdrm_vigs_la_LIBADD = ../libdrm.la @PTHREADSTUBS_LIBS@
+ 
+ libdrm_vigs_la_SOURCES = vigs.c
+diff --git a/vigs/vigs.c b/vigs/vigs.c
+index dc95a7c..f49d777 100644
+--- a/vigs/vigs.c
++++ b/vigs/vigs.c
+@@ -286,6 +286,7 @@ int vigs_drm_surface_create(struct vigs_drm_device *dev,
+                             uint32_t height,
+                             uint32_t stride,
+                             uint32_t format,
++                            int scanout,
+                             struct vigs_drm_surface **sfc)
+ {
+     struct vigs_drm_surface_impl *sfc_impl;
+@@ -295,6 +296,7 @@ int vigs_drm_surface_create(struct vigs_drm_device *dev,
+         .height = height,
+         .stride = stride,
+         .format = format,
++        .scanout = scanout,
+     };
+     int ret;
+ 
+@@ -322,6 +324,7 @@ int vigs_drm_surface_create(struct vigs_drm_device *dev,
+     sfc_impl->base.height = height;
+     sfc_impl->base.stride = stride;
+     sfc_impl->base.format = format;
++    sfc_impl->base.scanout = scanout;
+     sfc_impl->base.id = req.id;
+ 
+     *sfc = &sfc_impl->base;
+@@ -381,6 +384,7 @@ int vigs_drm_surface_open(struct vigs_drm_device *dev,
+     sfc_impl->base.height = info_req.height;
+     sfc_impl->base.stride = info_req.stride;
+     sfc_impl->base.format = info_req.format;
++    sfc_impl->base.scanout = info_req.scanout;
+     sfc_impl->base.id = info_req.id;
+ 
+     *sfc = &sfc_impl->base;
+diff --git a/vigs/vigs.h b/vigs/vigs.h
+index f44027b..87c6b0f 100644
+--- a/vigs/vigs.h
++++ b/vigs/vigs.h
+@@ -81,6 +81,7 @@ struct vigs_drm_surface
+     uint32_t height;
+     uint32_t stride;
+     uint32_t format;
++    int scanout;
+     uint32_t id;
+ };
+ 
+@@ -165,6 +166,7 @@ int vigs_drm_surface_create(struct vigs_drm_device *dev,
+                             uint32_t height,
+                             uint32_t stride,
+                             uint32_t format,
++                            int scanout,
+                             struct vigs_drm_surface **sfc);
+ 
+ int vigs_drm_surface_open(struct vigs_drm_device *dev,

@@ -1,0 +1,29 @@
+From: SooChan Lim <sc1.lim@samsung.com>
+Date: Mon, 23 Sep 2013 15:17:30 +0900
+Subject: add values for virtual connector and encoder
+
+Change-Id: I09bbf2691cff9d43d5073918f4ce96b92f5f59e3
+---
+ include/drm/drm_mode.h | 2 ++
+ 1 file changed, 2 insertions(+)
+
+diff --git a/include/drm/drm_mode.h b/include/drm/drm_mode.h
+index 76fd76b..6ea2d96 100644
+--- a/include/drm/drm_mode.h
++++ b/include/drm/drm_mode.h
+@@ -173,6 +173,7 @@ struct drm_mode_get_plane_res {
+ #define DRM_MODE_ENCODER_TMDS	2
+ #define DRM_MODE_ENCODER_LVDS	3
+ #define DRM_MODE_ENCODER_TVDAC	4
++#define DRM_MODE_ENCODER_VIRTUAL	5
+ 
+ struct drm_mode_get_encoder {
+ 	__u32 encoder_id;
+@@ -210,6 +211,7 @@ struct drm_mode_get_encoder {
+ #define DRM_MODE_CONNECTOR_HDMIB	12
+ #define DRM_MODE_CONNECTOR_TV		13
+ #define DRM_MODE_CONNECTOR_eDP		14
++#define DRM_MODE_CONNECTOR_VIRTUAL	15
+ 
+ struct drm_mode_get_connector {
+ 
