@@ -78,25 +78,25 @@ def freenivi_package_create(type, d):
 
 fakeroot python freenivi_package_sdk() {
         freenivi_package_create('DISTRO', d)
-    	freenivi_package_create('ARCH', d)
-    	freenivi_package_create('SDK', d)
+        freenivi_package_create('ARCH', d)
+        freenivi_package_create('SDK', d)
 
         bb.build.exec_func(d.getVar('FREENIVI_PACKAGE_SDK_SCRIPT_FUNCTION', True), d)
-	bb.build.exec_func(d.getVar('FREENIVI_PACKAGE_SDK_FILL_DATA', True), d)
+        bb.build.exec_func(d.getVar('FREENIVI_PACKAGE_SDK_FILL_DATA', True), d)
 }
 
 fakeroot freenivi_package_sdk_script_function() {
-    	# copy install script
-    	cp ${FREENIVI_TEMPLATES}/installscript.qs.in ${FREENIVI_PACKAGE_DEPLOY_DIRECTORY}/${FREENIVI_PACKAGE_SDK_NAME}/meta/installscript.qs
-    	# substitute variables
-    	sed -i -e 's#@FREENIVI_PACKAGE_SDK_DIRECTORY@#${FREENIVI_PACKAGE_SDK_DIRECTORY}#g' \
-    	        ${FREENIVI_PACKAGE_DEPLOY_DIRECTORY}/${FREENIVI_PACKAGE_SDK_NAME}/meta/installscript.qs
+        # copy install script
+        cp ${FREENIVI_TEMPLATES}/installscript.qs.in ${FREENIVI_PACKAGE_DEPLOY_DIRECTORY}/${FREENIVI_PACKAGE_SDK_NAME}/meta/installscript.qs
+        # substitute variables
+        sed -i -e 's#@FREENIVI_PACKAGE_SDK_DIRECTORY@#${FREENIVI_PACKAGE_SDK_DIRECTORY}#g' \
+                ${FREENIVI_PACKAGE_DEPLOY_DIRECTORY}/${FREENIVI_PACKAGE_SDK_NAME}/meta/installscript.qs
 }
 
 fakeroot freenivi_package_sdk_fill_data() {
         # copy sdk files to package
-	mkdir -p ${FREENIVI_PACKAGE_DEPLOY_DIRECTORY}/${FREENIVI_PACKAGE_SDK_NAME}/data/${FREENIVI_PACKAGE_SDK_DIRECTORY}
-    	cp -r ${SDK_OUTPUT}/${SDKPATH}/* ${FREENIVI_PACKAGE_DEPLOY_DIRECTORY}/${FREENIVI_PACKAGE_SDK_NAME}/data/${FREENIVI_PACKAGE_SDK_DIRECTORY}
+        mkdir -p ${FREENIVI_PACKAGE_DEPLOY_DIRECTORY}/${FREENIVI_PACKAGE_SDK_NAME}/data/${FREENIVI_PACKAGE_SDK_DIRECTORY}
+        cp -r ${SDK_OUTPUT}/${SDKPATH}/* ${FREENIVI_PACKAGE_DEPLOY_DIRECTORY}/${FREENIVI_PACKAGE_SDK_NAME}/data/${FREENIVI_PACKAGE_SDK_DIRECTORY}
 }
 
 fakeroot python freenivi_package_image() {
@@ -113,15 +113,15 @@ fakeroot python do_freenivi_package_image() {
 
 fakeroot freenivi_package_image_fill_data() {
         # copy the image into the package
-    	mkdir -p ${FREENIVI_PACKAGE_DEPLOY_DIRECTORY}/${FREENIVI_PACKAGE_IMAGE_NAME}/data/${FREENIVI_PACKAGE_IMAGE_DIRECTORY}
-    	cp ${DEPLOY_DIR_IMAGE}/${IMAGE_LINK_NAME}.ext4 ${FREENIVI_PACKAGE_DEPLOY_DIRECTORY}/${FREENIVI_PACKAGE_IMAGE_NAME}/data/${FREENIVI_PACKAGE_IMAGE_DIRECTORY}
-    	cp ${DEPLOY_DIR_IMAGE}/${KERNEL_IMAGETYPE} ${FREENIVI_PACKAGE_DEPLOY_DIRECTORY}/${FREENIVI_PACKAGE_IMAGE_NAME}/data/${FREENIVI_PACKAGE_IMAGE_DIRECTORY}
-    	if [ -e ${DEPLOY_DIR_IMAGE}/${IMAGE_LINK_NAME}.sdcard ]; then
+        mkdir -p ${FREENIVI_PACKAGE_DEPLOY_DIRECTORY}/${FREENIVI_PACKAGE_IMAGE_NAME}/data/${FREENIVI_PACKAGE_IMAGE_DIRECTORY}
+        cp ${DEPLOY_DIR_IMAGE}/${IMAGE_LINK_NAME}.ext4 ${FREENIVI_PACKAGE_DEPLOY_DIRECTORY}/${FREENIVI_PACKAGE_IMAGE_NAME}/data/${FREENIVI_PACKAGE_IMAGE_DIRECTORY}
+        cp ${DEPLOY_DIR_IMAGE}/${KERNEL_IMAGETYPE} ${FREENIVI_PACKAGE_DEPLOY_DIRECTORY}/${FREENIVI_PACKAGE_IMAGE_NAME}/data/${FREENIVI_PACKAGE_IMAGE_DIRECTORY}
+        if [ -e ${DEPLOY_DIR_IMAGE}/${IMAGE_LINK_NAME}.sdcard ]; then
                 cp ${DEPLOY_DIR_IMAGE}/${IMAGE_LINK_NAME}.sdcard ${FREENIVI_PACKAGE_DEPLOY_DIRECTORY}/${FREENIVI_PACKAGE_IMAGE_NAME}/data/${FREENIVI_PACKAGE_IMAGE_DIRECTORY}
-    	fi
+        fi
 
         # add documentation
-    	cat << EOF > ${FREENIVI_PACKAGE_DEPLOY_DIRECTORY}/${FREENIVI_PACKAGE_IMAGE_NAME}/data/${FREENIVI_PACKAGE_IMAGE_DIRECTORY}/README
+        cat << EOF > ${FREENIVI_PACKAGE_DEPLOY_DIRECTORY}/${FREENIVI_PACKAGE_IMAGE_NAME}/data/${FREENIVI_PACKAGE_IMAGE_DIRECTORY}/README
 Freenivi Image Package
 ======================
 
