@@ -10,6 +10,7 @@ SRC_URI += " \
     file://install-headers.patch \
     file://mesa-egl-no-headers.patch \
     file://0006-add-wl-egl-platfrom-in-eglplatform-header.patch \
+    file://0010-add-missing-include.patch \
     file://95-yagl.rules \
 "
 
