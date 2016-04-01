@@ -11,5 +11,5 @@ create_sdk_files_append() {
 }
 
 do_install_append() {
-    chmod +x ${SDK_OUTPUT}/${SDKPATH}/*.sh
+    chmod +x ${D}/${SDKPATH}/*.sh
 }
