@@ -10,7 +10,7 @@ source ${SDK_TARGET_DIRECTORY}/environment-setup-@REAL_MULTIMACH_TARGET_SYS@
 # not set it
 OE_QMAKE_COMPILER=gcc
 
-MKSPEC="linux-@TARGET_VENDOR@-g++"
+MKSPEC="linux@TARGET_VENDOR@-g++"
 MKSPEC_PATH="$QMAKESPEC/../$MKSPEC"
 cp -r "$QMAKESPEC" "$MKSPEC_PATH"
 error_code=$?
