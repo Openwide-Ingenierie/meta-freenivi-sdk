@@ -1,0 +1,14 @@
+Subject: [PATCH] add missing include for 'stat'
+
+diff --git a/EGL/gbm/yagl_gbm_display.c b/EGL/gbm/yagl_gbm_display.c
+index a0ebd3c..8483de3 100644
+--- a/EGL/gbm/yagl_gbm_display.c
++++ b/EGL/gbm/yagl_gbm_display.c
+@@ -10,6 +10,7 @@
+ #include <libudev.h>
+ #include <string.h>
+ #include <stdlib.h>
++#include <sys/stat.h>
+ 
+ static struct udev_device *udev_device_new_from_fd(struct udev *udev, int fd)
+ {
