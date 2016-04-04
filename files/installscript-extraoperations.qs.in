@@ -1,0 +1,8 @@
+    if (installer.componentByName("qt_creator") != null &&
+        (installer.componentByName("qt_creator").installationRequested() ||
+         installer.componentByName("qt_creator").isInstalled()))
+        component.addOperation(
+            "Execute", "@TargetDir@/@FREENIVI_PACKAGE_SDK_DIRECTORY@/add-kit-@REAL_MULTIMACH_TARGET_SYS@.sh", "@TargetDir@/QtCreator/bin/sdktool",
+            "UNDOEXECUTE", "@TargetDir@/@FREENIVI_PACKAGE_SDK_DIRECTORY@/del-kit-@REAL_MULTIMACH_TARGET_SYS@.sh", "@TargetDir@/QtCreator/bin/sdktool"
+        );
+

@@ -21,6 +21,7 @@ FREENIVI_PACKAGE_SDK_DESCRIPTION ?= "${DISTRO_NAME} (version ${DISTRO_VERSION}) 
 FREENIVI_PACKAGE_SDK_PRIORITY ?= "100"
 FREENIVI_PACKAGE_SDK_SCRIPT ?= "installscript.qs"
 FREENIVI_PACKAGE_SDK_DIRECTORY ?= "SDK/${DISTRO}_v${DISTRO_VERSION}/${REAL_MULTIMACH_TARGET_SYS}/"
+FREENIVI_PACKAGE_SDK_PRE_SCRIPT_FUNCTION ?= "freenivi_package_sdk_pre_script_function"
 FREENIVI_PACKAGE_SDK_SCRIPT_FUNCTION ?= "freenivi_package_sdk_script_function"
 FREENIVI_PACKAGE_SDK_FILL_DATA ?= "freenivi_package_sdk_fill_data"
 
@@ -81,16 +82,57 @@ fakeroot python freenivi_package_sdk() {
         freenivi_package_create('ARCH', d)
         freenivi_package_create('SDK', d)
 
+        bb.build.exec_func(d.getVar('FREENIVI_PACKAGE_SDK_PRE_SCRIPT_FUNCTION', True), d)
         bb.build.exec_func(d.getVar('FREENIVI_PACKAGE_SDK_SCRIPT_FUNCTION', True), d)
         bb.build.exec_func(d.getVar('FREENIVI_PACKAGE_SDK_FILL_DATA', True), d)
 }
 
+# see do_generate_content in meta-environment.bb
+python freenivi_package_sdk_pre_script_function() {
+    # Handle multilibs in the SDK environment, siteconfig, etc files...
+    localdata = bb.data.createCopy(d)
+
+    # make sure we only use the WORKDIR value from 'd', or it can change
+    localdata.setVar('WORKDIR', d.getVar('WORKDIR', True))
+
+    # make sure we only use the SDKTARGETSYSROOT value from 'd'
+    localdata.setVar('SDKTARGETSYSROOT', d.getVar('SDKTARGETSYSROOT', True))
+    localdata.setVar('libdir', d.getVar('target_libdir', False))
+
+    # Process DEFAULTTUNE
+    bb.build.exec_func("create_installscript_extraoperations", localdata)
+
+    variants = d.getVar("MULTILIB_VARIANTS", True) or ""
+    for item in variants.split():
+        # Load overrides from 'd' to avoid having to reset the value...
+        overrides = d.getVar("OVERRIDES", False) + ":virtclass-multilib-" + item
+        localdata.setVar("OVERRIDES", overrides)
+        localdata.setVar("MLPREFIX", item + "-")
+        bb.data.update_data(localdata)
+        bb.build.exec_func("create_installscript_extraoperations", localdata)
+}
+
+create_installscript_extraoperations() {
+	# create files for one multilib target, will be called twice for multilib
+	cp ${FREENIVI_TEMPLATES}/installscript-extraoperations.qs.in ${T}/installscript_extraoperations-${REAL_MULTIMACH_TARGET_SYS}
+	sed -i -e 's#@REAL_MULTIMACH_TARGET_SYS@#${REAL_MULTIMACH_TARGET_SYS}#g' \
+		${T}/installscript_extraoperations-${REAL_MULTIMACH_TARGET_SYS}
+}
+
 fakeroot freenivi_package_sdk_script_function() {
         # copy install script
-        cp ${FREENIVI_TEMPLATES}/installscript.qs.in ${FREENIVI_PACKAGE_DEPLOY_DIRECTORY}/${FREENIVI_PACKAGE_SDK_NAME}/meta/installscript.qs
+        cp ${FREENIVI_TEMPLATES}/installscript.qs.in ${FREENIVI_PACKAGE_DEPLOY_DIRECTORY}/${FREENIVI_PACKAGE_SDK_NAME}/meta/${FREENIVI_PACKAGE_SDK_SCRIPT}
+	# add extraoperation for multilib
+	rm -f ${T}/installscript_extraoperations
+	cat ${T}/installscript_extraoperations-* > ${T}/installscript_extraoperations
+	sed -i -e '/@INSTALLSCRIPT_EXTRAOPERATIONS@/r ${T}/installscript_extraoperations' \
+		${FREENIVI_PACKAGE_DEPLOY_DIRECTORY}/${FREENIVI_PACKAGE_SDK_NAME}/meta/${FREENIVI_PACKAGE_SDK_SCRIPT}
+
+
         # substitute variables
         sed -i -e 's#@FREENIVI_PACKAGE_SDK_DIRECTORY@#${FREENIVI_PACKAGE_SDK_DIRECTORY}#g' \
-                ${FREENIVI_PACKAGE_DEPLOY_DIRECTORY}/${FREENIVI_PACKAGE_SDK_NAME}/meta/installscript.qs
+		-e '/@INSTALLSCRIPT_EXTRAOPERATIONS@/d' \
+                ${FREENIVI_PACKAGE_DEPLOY_DIRECTORY}/${FREENIVI_PACKAGE_SDK_NAME}/meta/${FREENIVI_PACKAGE_SDK_SCRIPT}
 }
 
 fakeroot freenivi_package_sdk_fill_data() {
