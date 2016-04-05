@@ -38,7 +38,7 @@ do_install_append () {
     ln -s libGLESv2.so.2.0 ${D}${libdir}/libGLESv2.so.2.0.0
     ln -s libGLESv2.so.2.0.0 ${D}${libdir}/libGL.so.1.2.0
 
-    install -d ${D}${libdir}/udev
+    install -d ${D}${libdir}/udev/rules.d
     install -m 644 ${WORKDIR}/95-yagl.rules ${D}${libdir}/udev/rules.d
 }
 
