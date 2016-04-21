@@ -26,6 +26,8 @@ FREENIVI_PACKAGE_SDK_SCRIPT_FUNCTION ?= "freenivi_package_sdk_script_function"
 FREENIVI_PACKAGE_SDK_FILL_DATA ?= "freenivi_package_sdk_fill_data"
 
 FREENIVI_IMAGE_NAME ?= "${IMAGE_BASENAME}"
+FREENIVI_IMAGE_DESCRIPTION ?= "${DESCRIPTION} for ${REAL_MULTIMACH_TARGET_SYS} "
+
 FREENIVI_PACKAGE_IMAGE_NAME ?= "${FREENIVI_PACKAGE_ARCH_NAME}.images.${@'${FREENIVI_IMAGE_NAME}'.replace('-', '_')}"
 FREENIVI_PACKAGE_IMAGE_DISPLAY_NAME ?= "${FREENIVI_IMAGE_NAME}"
 FREENIVI_PACKAGE_IMAGE_DESCRIPTION ?= "${FREENIVI_IMAGE_DESCRIPTION}"
@@ -33,6 +35,16 @@ FREENIVI_PACKAGE_IMAGE_DIRECTORY ?= "images/${DISTRO}_v${DISTRO_VERSION}/${REAL_
 FREENIVI_PACKAGE_IMAGE_FILL_DATA ?= "freenivi_package_image_fill_data"
 FREENIVI_PACKAGE_IMAGE_FSTYPE ?= "ext4"
 FREENIVI_PACKAGE_IMAGE_SDIMG ?= "sdcard.gz"
+FREENIVI_PACKAGE_IMAGE_SDIMG_RAW ?= "sdcard"
+
+# Raspberrypi has specific format so package it
+FREENIVI_PACKAGE_IMAGE_FSTYPE_raspberrypi ?= "ext3"
+FREENIVI_PACKAGE_IMAGE_SDIMG_raspberrypi ?= "rpi-sdimg"
+FREENIVI_PACKAGE_IMAGE_SDIMG_RAW_raspberrypi ?= "rpi-sdimg"
+
+FREENIVI_PACKAGE_IMAGE_FSTYPE_raspberrypi2 ?= "ext3"
+FREENIVI_PACKAGE_IMAGE_SDIMG_raspberrypi2 ?= "rpi-sdimg"
+FREENIVI_PACKAGE_IMAGE_SDIMG_RAW_raspberrypi2 ?= "rpi-sdimg"
 
 FREENIVI_PACKAGE_EMULATOR_NAME ?= "${FREENIVI_PACKAGE_ARCH_NAME}.emulator"
 FREENIVI_PACKAGE_EMULATOR_DISPLAY_NAME ?= "Emulator"
@@ -178,7 +190,7 @@ EOF
  - ${IMAGE_LINK_NAME}.${FREENIVI_PACKAGE_IMAGE_SDIMG}: a SD card ready image
 
 To put the SD card ready image, use this command:
- # dd if=${IMAGE_LINK_NAME}.${FREENIVI_PACKAGE_IMAGE_SDIMG} of=<SD card device entry, e,g, /dev/mmcblk0>
+ # dd if=${IMAGE_LINK_NAME}.${FREENIVI_PACKAGE_IMAGE_SDIMG_RAW} of=<SD card device entry, e,g, /dev/mmcblk0>
 
 /!\ The SD card must be unmounted!
 EOF
