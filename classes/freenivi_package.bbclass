@@ -178,7 +178,7 @@ EOF
  - ${IMAGE_LINK_NAME}.${FREENIVI_PACKAGE_IMAGE_SDIMG}: a SD card ready image
 
 To put the SD card ready image, use this command:
- # dd if=${IMAGE_PACKAGE_SDCARD} of=<SD card device entry, e,g, /dev/mmcblk0>
+ # dd if=${IMAGE_LINK_NAME}.${FREENIVI_PACKAGE_IMAGE_SDIMG} of=<SD card device entry, e,g, /dev/mmcblk0>
 
 /!\ The SD card must be unmounted!
 EOF
