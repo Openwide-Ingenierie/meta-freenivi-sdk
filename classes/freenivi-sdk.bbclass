@@ -9,11 +9,11 @@ fakeroot tar_sdk() {
 SDK_PACKAGING_FUNC = "create_setup; freenivi_package_sdk"
 
 # setup-sdk.sh.in is based on toolchain-shar-extract.sh
-# but the default install folder is the script location
+# but the default install folder is the script location
 # the archive is not extracted but the content is expected to be present
 fakeroot create_setup() {
 	# copy in the template setup script
-	cp ${FREENIVI_TEMPLATES}/setup-sdk.sh.in ${SDK_DEPLOY}/setup.sh
+	cp ${FREENIVI_TEMPLATES}/setup-sdk.sh.in ${SDK_OUTPUT}/${SDKPATH}/setup-sdk.sh
 
 	rm -f ${T}/pre_install_command ${T}/post_install_command
 
@@ -29,7 +29,7 @@ ${SDK_POST_INSTALL_COMMAND}
 EOF
 	sed -i -e '/@SDK_PRE_INSTALL_COMMAND@/r ${T}/pre_install_command' \
 		-e '/@SDK_POST_INSTALL_COMMAND@/r ${T}/post_install_command' \
-		${SDK_DEPLOY}/setup.sh
+		${SDK_OUTPUT}/${SDKPATH}/setup-sdk.sh
 
 	# substitute variables
 	sed -i -e 's#@SDK_ARCH@#${SDK_ARCH}#g' \
@@ -41,10 +41,10 @@ EOF
 		-e 's#@SDK_VERSION@#${SDK_VERSION}#g' \
 		-e '/@SDK_PRE_INSTALL_COMMAND@/d' \
 		-e '/@SDK_POST_INSTALL_COMMAND@/d' \
-		${SDK_DEPLOY}/setup.sh
+		${SDK_OUTPUT}/${SDKPATH}/setup-sdk.sh
 
 	# add execution permission
-	chmod +x ${SDK_DEPLOY}/setup.sh
+	chmod +x ${SDK_OUTPUT}/${SDKPATH}/setup-sdk.sh
 
 }
 
